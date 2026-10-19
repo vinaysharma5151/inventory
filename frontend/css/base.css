@@ -1,0 +1,194 @@
+/* ============================================================
+   MEHAK BRIDAL STUDIO — Luxury Bridal Studio Design System
+   Serene, eye-friendly, calm luxury aesthetic with crisp typography
+   Vanilla CSS — Zero External Dependencies — Offline Ready
+   ============================================================ */
+
+:root {
+  /* Soothing, Eye-Friendly Palette (Clean neutral mist — zero eye fatigue) */
+  --bg-main:         #F8F9FA;
+  --bg-surface:      #FFFFFF;
+  --bg-card:         #FFFFFF;
+  --bg-subtle:       #F3F4F6;
+  --bg-hover:        #F9FAFB;
+  --bg-glass:        rgba(255, 255, 255, 0.92);
+
+  /* Refined Champagne Bronze & Gold */
+  --gold:            #9E7B3B;
+  --gold-dark:       #82632B;
+  --gold-light:      #BFA266;
+  --gold-bg:         #FDF9F2;
+  --gold-border:     #EEDFC6;
+  --gold-gradient:   linear-gradient(135deg, #A88645 0%, #8C6A2A 100%);
+  --gold-glow:       rgba(158, 123, 59, 0.12);
+
+  /* Modern Obsidian Luxury Accent */
+  --accent-noir:       #18181B;
+  --accent-noir-hover: #27272A;
+
+  /* Status Colors */
+  --success:         #059669;
+  --success-bg:      #ECFDF5;
+  --success-border:  #A7F3D0;
+  --success-text:    #065F46;
+
+  --warning:         #D97706;
+  --warning-bg:      #FFFBEB;
+  --warning-border:  #FDE68A;
+  --warning-text:    #92400E;
+
+  --danger:          #DC2626;
+  --danger-bg:       #FEF2F2;
+  --danger-border:   #FECACA;
+  --danger-text:     #991B1B;
+
+  /* Neutral Borders */
+  --border-light:    #E5E7EB;
+  --border-subtle:   #F0F2F5;
+  --border-focus:    #9E7B3B;
+
+  /* Typography Hierarchy */
+  --text-primary:    #111827;
+  --text-secondary:  #4B5563;
+  --text-muted:      #6B7280;
+  --text-dim:        #9CA3AF;
+
+  /* System Fonts (zero network/CDN dependency at runtime) */
+  --font-sans:       'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-serif:      'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-mono:       'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+
+  /* Geometry & Soft Elevation */
+  --radius-xs:       6px;
+  --radius-sm:       10px;
+  --radius-md:       14px;
+  --radius-lg:       18px;
+  --radius-xl:       24px;
+  --radius-full:     9999px;
+
+  --shadow-sm:       0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-md:       0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-lg:       0 12px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.02);
+  --shadow-hover:    0 8px 24px -2px rgba(0, 0, 0, 0.08);
+
+  /* Animation */
+  --transition-fast: 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  line-height: 1.5;
+}
+
+#app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-subtle);
+}
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Typography Utilities */
+.font-serif { font-family: var(--font-serif); }
+.font-sans  { font-family: var(--font-sans); }
+.font-mono  { font-family: var(--font-mono); }
+
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: scale(0.95); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+
+@keyframes flashEffect {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.flash-screen {
+  position: absolute;
+  inset: 0;
+  background: #FFFFFF;
+  pointer-events: none;
+  z-index: 50;
+  animation: flashEffect 0.2s ease-out forwards;
+}
+
+/* Toast Notifications */
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  animation: modalPop 0.2s ease;
+  min-width: 270px;
+}
+
+.toast-item.neutral {
+  border-left-color: #6B7280;
+}
+
+.toast-item.error {
+  border-left-color: #DC2626;
+}
+

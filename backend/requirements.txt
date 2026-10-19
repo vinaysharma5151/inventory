@@ -1,0 +1,6 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+qrcode[pil]==8.0
+bcrypt==5.0.0
+Pillow==11.3.0

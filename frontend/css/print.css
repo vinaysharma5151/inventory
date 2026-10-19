@@ -1,0 +1,206 @@
+/* ════════════════════════════════════════
+   PRINTABLE GARMENT HANGER TAG / 80mm THERMAL RECEIPT
+════════════════════════════════════════ */
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+@media screen {
+  .printable-tag-wrapper {
+    display: none;
+  }
+}
+
+@media print {
+  html, body {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #FFF !important;
+    color: #000 !important;
+    font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-hanger-tag,
+  #printable-hanger-tag * {
+    visibility: visible;
+  }
+
+  #printable-hanger-tag {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 76mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 4mm 3mm !important;
+    background: #FFF !important;
+    color: #000 !important;
+    display: block !important;
+    box-sizing: border-box !important;
+  }
+
+  .tag-inner-card {
+    width: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-family: 'Courier New', Courier, monospace, -apple-system, sans-serif !important;
+    text-align: center;
+    color: #000 !important;
+    box-sizing: border-box !important;
+  }
+
+  .tag-header {
+    margin-bottom: 4px;
+    text-align: center;
+  }
+
+  .tag-brand {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: #000 !important;
+  }
+
+  .tag-sub {
+    font-size: 10px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 2px 0 3px 0 !important;
+    color: #000 !important;
+  }
+
+  .tag-timestamp {
+    font-size: 9px !important;
+    color: #000 !important;
+    margin-bottom: 3px;
+  }
+
+  .tag-divider {
+    border: none !important;
+    border-top: 1px dashed #000 !important;
+    margin: 6px 0 !important;
+  }
+
+  .tag-id-box {
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    border: 2px solid #000 !important;
+    background: #FFF !important;
+    color: #000 !important;
+    padding: 5px 4px !important;
+    margin: 6px 0 !important;
+    letter-spacing: 2px;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .tag-id-box .tag-id-title {
+    font-size: 9px !important;
+    letter-spacing: 1px;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .tag-details-table {
+    text-align: left;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+    margin: 6px 0 !important;
+    color: #000 !important;
+  }
+
+  .tag-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 2px 0;
+    font-size: 11px !important;
+    color: #000 !important;
+  }
+
+  .tag-label {
+    color: #000 !important;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-right: 6px;
+  }
+
+  .tag-val {
+    font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+    color: #000 !important;
+  }
+
+  .tag-val.bold {
+    font-weight: 900 !important;
+  }
+
+  .tag-dates-section {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    margin: 5px 0;
+    background: #FFF;
+  }
+
+  .highlight-due {
+    font-size: 12px !important;
+    border: 2px solid #000 !important;
+    background: #FFF !important;
+    color: #000 !important;
+    padding: 4px 6px !important;
+    margin: 6px 0 !important;
+    border-radius: 0 !important;
+    font-weight: 900 !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .highlight-due .tag-label,
+  .highlight-due .tag-val {
+    color: #000 !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+  }
+
+  .tag-footer {
+    font-size: 9px !important;
+    color: #000 !important;
+    margin-top: 6px !important;
+    border-top: 1px dashed #000 !important;
+    padding-top: 6px !important;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .tag-cut-indicator {
+    margin-top: 6px;
+    font-size: 9px !important;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+}
+
+/* Spinner helper */
+.spinner-icon {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

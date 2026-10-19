@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# PyInstaller / Executables
+build/
+dist/
+*.exe
+*.zip
+
+# Operating System & Thumbnails
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+
+# Editor & IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# SQLite temporary journal / WAL files
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+
+# Keep directories but ignore runtime content
+uploads/*
+!uploads/.gitkeep
+
+backups/*
+!backups/.gitkeep
+
+logs/*
+!logs/.gitkeep
