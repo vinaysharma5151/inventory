@@ -13,8 +13,7 @@ WHAT THIS SCRIPT DOES:
      Resets SQLite auto-increment sequences so article numbering starts fresh from 0001.
   3. Uploads Purge: Deletes all uploaded garment photos from uploads/ directory.
   4. Cache & WAL Flush: Removes SQLite temporary lock/journal files and AppleDouble dot-files.
-  5. Clean Slate Setup: Resets shop settings so the web app shows the initial setup modal.
-     Optionally resets clean demo staff accounts (Rahul, Priya, Deepak).
+  5. Clean Slate Setup: Resets shop settings and initial configurations.
   6. SQLite Optimization: Runs PRAGMA wal_checkpoint and VACUUM to minimize file size.
 
 USAGE:
@@ -60,8 +59,6 @@ CREATE TABLE articles (
     security_deposit REAL    DEFAULT 0,
     advance_amount   REAL    DEFAULT 0,
     balance_amount   REAL    DEFAULT 0,
-    color            TEXT    DEFAULT 'Red',
-    size             TEXT    DEFAULT 'Free Size',
     notes            TEXT,
     image_path       TEXT    NOT NULL,
     source           TEXT    DEFAULT 'phone',
@@ -83,12 +80,6 @@ CREATE INDEX idx_articles_pickup_date ON articles(pickup_date);
 CREATE INDEX idx_articles_return_date ON articles(return_date);
 CREATE INDEX idx_articles_customer    ON articles(customer_name);
 
-CREATE TABLE salesmen (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    name          TEXT    NOT NULL UNIQUE,
-    password_hash TEXT    NOT NULL,
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,13 +132,6 @@ CREATE TABLE settings (
     value TEXT
 );
 """
-
-# Default clean demo staff accounts
-_DEFAULT_STAFF = [
-    ("Rahul",  "rahul123"),
-    ("Priya",  "priya123"),
-    ("Deepak", "deepak123"),
-]
 
 
 def hash_password(plain: str) -> str:
@@ -257,8 +241,8 @@ def clean_temp_files():
             pass
 
 
-def reset_database(include_default_staff: bool = True):
-    """Rebuild database schema, clear sequences, insert clean staff and default settings."""
+def reset_database():
+    """Rebuild database schema, clear sequences, and insert default settings."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(DB_PATH)
@@ -272,31 +256,22 @@ def reset_database(include_default_staff: bool = True):
         # Execute fresh schema
         cursor.executescript(_SCHEMA)
 
+        # Clean up legacy salesmen table if any
+        cursor.execute("DROP TABLE IF EXISTS salesmen;")
+        cursor.execute("DELETE FROM users WHERE role = 'staff';")
+
         # Clear sqlite_sequence so AUTOINCREMENT restarts at 1
         try:
             cursor.execute("DELETE FROM sqlite_sequence;")
         except sqlite3.OperationalError:
             pass
 
-        # Optionally insert default clean staff into both salesmen and users tables
-        if include_default_staff:
-            for name, pwd in _DEFAULT_STAFF:
-                h = hash_password(pwd)
-                cursor.execute(
-                    "INSERT INTO salesmen (name, password_hash) VALUES (?, ?);",
-                    (name, h),
-                )
-                cursor.execute(
-                    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'staff');",
-                    (name, h),
-                )
-
-        # Insert initial clean settings (leaving first_time_setup_completed absent for fresh onboarding)
+        # Insert initial clean settings
         cursor.execute(
             "INSERT INTO settings (key, value) VALUES ('shop_name', 'Mehak Bridal Studio');"
         )
         cursor.execute(
-            "INSERT INTO settings (key, value) VALUES ('github_repo', 'vinaysharma5151/inventory');"
+            "INSERT INTO settings (key, value) VALUES ('first_time_setup_completed', 'true');"
         )
 
         conn.commit()
@@ -321,8 +296,7 @@ def print_banner():
     print("  • Deletes all articles, bookings, and customer details")
     print("  • Resets article sequence numbering (next article will be 0001)")
     print("  • Clears all uploaded garment photos in uploads/")
-    print("  • Resets shop settings (triggers setup modal on next launch)")
-    print("  • Configures clean default staff accounts (Rahul, Priya, Deepak)")
+    print("  • Resets shop settings to defaults")
     print("=" * 64)
 
 
@@ -359,16 +333,14 @@ def main():
     print("      Temporary WAL and metadata files cleared.")
 
     print("\n[4/5] Resetting database schema and auto-increment sequences...")
-    reset_database(include_default_staff=True)
-    print("      Database recreated with clean schema and default demo staff.")
+    reset_database()
+    print("      Database recreated with clean schema.")
 
     print("\n[5/5] Verifying fresh system state...")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     articles_count = conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
-    staff_count = conn.execute("SELECT COUNT(*) FROM salesmen").fetchone()[0]
     settings_count = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
-    staff_names = [r["name"] for r in conn.execute("SELECT name FROM salesmen ORDER BY id").fetchall()]
     conn.close()
 
     # Final temp file cleanup and ship mode check
@@ -394,11 +366,7 @@ def main():
     print(f"  • Total Articles in Catalog: {articles_count} (Fresh start)")
     print(f"  • Next Article ID:           0001")
     print(f"  • Uploaded Photos Remaining: {remaining_uploads}")
-    print(f"  • Active Staff Accounts:     {staff_count} ({', '.join(staff_names)})")
-    print(f"    - Rahul  (Password: rahul123)")
-    print(f"    - Priya  (Password: priya123)")
-    print(f"    - Deepak (Password: deepak123)")
-    print(f"  • Shop Settings Configured:  {settings_count} (Blank — ready for setup)")
+    print(f"  • Shop Settings Configured:  {settings_count} (Default showroom settings)")
     print("-" * 64)
     print("  HOW TO LAUNCH THE FRESH APP:")
     print("    • Windows: Double click Start_App_Windows.bat or run:")

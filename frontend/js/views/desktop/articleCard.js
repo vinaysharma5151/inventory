@@ -6,7 +6,7 @@
  * thermal tag printing, WhatsApp e-bill sending, dues clearout) for a single article.
  */
 
-import { api } from '../../api.js?v=6';
+import { api } from '../../api.js?v=7';
 import { renderIcon } from '../../icons.js';
 import { printThermalBill, printGarmentTag } from '../../tag.js?v=9';
 import { showToast } from '../../toast.js';
@@ -40,6 +40,21 @@ export function createArticleCard(item, context) {
     ? Number(item.balance_amount)
     : Math.max(0, numPrice - numAdvance);
 
+  const customerName = (item.customer_name || '').trim();
+  const personDisplayName = customerName || (
+    (item.title && !item.title.startsWith('Booking –') && !item.title.startsWith('Booking -') && item.title.toLowerCase() !== (item.category || '').toLowerCase())
+      ? item.title
+      : 'Customer'
+  );
+
+  const hasDistinctOutfit = Boolean(
+    item.title &&
+    !item.title.startsWith('Booking –') &&
+    !item.title.startsWith('Booking -') &&
+    item.title.toLowerCase() !== (item.category || '').toLowerCase() &&
+    item.title.toLowerCase() !== customerName.toLowerCase()
+  );
+
   const isPaid = numPrice > 0 && numBalance === 0;
 
   const card = document.createElement('div');
@@ -49,7 +64,7 @@ export function createArticleCard(item, context) {
     <div class="article-card-media" data-id="${item.id}">
       <img
         src="${escapeHtml(item.image_path)}"
-        alt="${escapeHtml(item.title || item.article_id)}"
+        alt="${escapeHtml(personDisplayName)}"
         class="article-card-img"
         loading="lazy"
         decoding="async"
@@ -68,28 +83,43 @@ export function createArticleCard(item, context) {
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
       </div>
 
-      <h3 class="card-title" title="${escapeHtml(item.title || item.article_id)}">
-        ${escapeHtml(item.title || `Designer Piece ${item.article_id}`)}
-      </h3>
+      <div class="card-header-block">
+        <h3 class="card-title" title="${escapeHtml(personDisplayName)}">
+          ${escapeHtml(personDisplayName)}
+        </h3>
 
-      <div class="card-salesman-strip">
-        <span class="salesman-chip">👤 ${escapeHtml(item.salesman_name || 'Studio')}</span>
-        ${item.customer_name ? `<span class="customer-chip" title="${escapeHtml(item.customer_name)}">🏷️ ${escapeHtml(item.customer_name)}</span>` : ''}
-        ${item.customer_phone ? `<span class="phone-chip font-mono">📞 ${escapeHtml(item.customer_phone)}</span>` : ''}
+        ${(item.customer_phone || hasDistinctOutfit) ? `
+          <div class="card-customer-meta">
+            ${item.customer_phone ? `
+              <span class="phone-chip font-mono" title="Customer Phone">
+                📞 ${escapeHtml(item.customer_phone)}
+              </span>
+            ` : ''}
+            ${hasDistinctOutfit ? `
+              <span class="outfit-chip" title="Outfit: ${escapeHtml(item.title)}">
+                👗 ${escapeHtml(item.title)}
+              </span>
+            ` : ''}
+          </div>
+        ` : ''}
       </div>
 
       ${(item.pickup_date || item.return_date) ? `
-        <div class="card-dates-row">
+        <div class="card-dates-box">
           ${item.pickup_date ? `
-            <div class="card-pickup-date">
-              ${renderIcon('calendar', { size: 12 })}
-              <span>Pickup: <strong>${escapeHtml(item.pickup_date)}</strong></span>
+            <div class="card-date-item card-date-pickup">
+              <span class="card-date-label">
+                ${renderIcon('calendar', { size: 12 })} Pickup:
+              </span>
+              <span class="card-date-val font-mono">${escapeHtml(item.pickup_date)}</span>
             </div>
           ` : ''}
           ${item.return_date ? `
-            <div class="card-return-date" title="Customer Return Back Date">
-              ${renderIcon('rotateCcw', { size: 12 })}
-              <span>Return: <strong>${escapeHtml(item.return_date)}</strong></span>
+            <div class="card-date-item card-date-return" title="Customer Return Back Date">
+              <span class="card-date-label">
+                ${renderIcon('rotateCcw', { size: 12 })} Return:
+              </span>
+              <span class="card-date-val font-mono">${escapeHtml(item.return_date)}</span>
             </div>
           ` : ''}
         </div>
@@ -108,17 +138,11 @@ export function createArticleCard(item, context) {
         </div>
       </div>
 
-      ${numBalance > 0 ? (
-        currentUser?.role !== 'staff' ? `
-          <button type="button" class="btn-clearout-card btn-clear-dues-action" title="Customer paid whole price — click to clear all dues">
-            ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
-          </button>
-        ` : `
-          <div class="settled-status-pill" style="background: rgba(217,119,6,0.08); color: #D97706; border: 1px solid rgba(217,119,6,0.2);">
-            ${renderIcon('alertCircle', { size: 13 })} Dues Remaining (Owner Action)
-          </div>
-        `
-      ) : `
+      ${numBalance > 0 ? `
+        <button type="button" class="btn-clearout-card btn-clear-dues-action" title="Customer paid whole price — click to clear all dues">
+          ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
+        </button>
+      ` : `
         <div class="settled-status-pill">
           ${renderIcon('checkCircle', { size: 13 })} Paid in Full (Dues Cleared)
         </div>
@@ -134,11 +158,6 @@ export function createArticleCard(item, context) {
         <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Thermal Bill / Receipt (Direct to Printer)">
           ${renderIcon('printer', { size: 13 })} Bill
         </button>
-        ${item.customer_phone ? `
-          <button type="button" class="btn btn-outline btn-sm card-action-btn btn-wa-card-action" title="Send WhatsApp E-Bill to Customer">
-            ${renderIcon('messageCircle', { size: 13 })} WA
-          </button>
-        ` : ''}
       </div>
     </div>
   `;
@@ -151,7 +170,6 @@ export function createArticleCard(item, context) {
   const editBtn = card.querySelector('.btn-edit-action');
   const tagBtn = card.querySelector('.btn-tag-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
-  const waCardBtn = card.querySelector('.btn-wa-card-action');
 
   const openDetails = () => {
     openArticleDetailModal(item, shopName, {
@@ -179,7 +197,7 @@ export function createArticleCard(item, context) {
   idPill.addEventListener('click', (e) => {
     e.stopPropagation();
     navigator.clipboard.writeText(item.article_id);
-    alert(`Copied ID: ${item.article_id}`);
+    showToast(`Copied ID: ${item.article_id}`, 'neutral');
   });
 
   tagBtn.addEventListener('click', (e) => {
@@ -193,50 +211,6 @@ export function createArticleCard(item, context) {
       openClearoutModal(item, (updated) => {
         if (onUpdate) onUpdate(updated);
       });
-    });
-  }
-
-  if (waCardBtn) {
-    waCardBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const origHtml = waCardBtn.innerHTML;
-      waCardBtn.disabled = true;
-      waCardBtn.innerHTML = `${renderIcon('loader', { size: 14, className: 'spinner-icon' })}`;
-
-      try {
-        const res = await api.sendWhatsAppBill(item.id);
-        waCardBtn.disabled = false;
-        waCardBtn.innerHTML = origHtml;
-
-        if (res.success) {
-          showToast(`WhatsApp e-bill sent to ${item.customer_name || 'Customer'}!`, 'success');
-        } else {
-          const cleanPhone = (item.customer_phone || '').replace(/\D/g, '');
-          const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-          const textToSend = res.ebill_text || (
-            `🌸 *${(shopName || 'MEHAK BRIDAL STUDIO').toUpperCase()}* 🌸\n` +
-            `✨ *Booking Confirmation & E-Bill* ✨\n\n` +
-            `Dear *${item.customer_name || 'Customer'}*,\n` +
-            `Thank you for choosing ${shopName}!\n\n` +
-            `🧾 *Article Code:* ${item.article_id}\n` +
-            `👗 *Outfit:* ${item.title || 'Bridal Lehenga'}\n` +
-            `📅 *Pickup Date:* ${item.pickup_date || 'N/A'}\n` +
-            `🔄 *Return Date:* ${item.return_date || 'N/A'}\n\n` +
-            `💵 *Total Rent:* ₹${Number(item.price || 0).toLocaleString('en-IN')}\n` +
-            `💳 *Advance Paid:* ₹${Number(item.advance_amount || 0).toLocaleString('en-IN')}\n` +
-            (Number(item.security_deposit || 0) > 0 ? `🛡️ *Security Deposit:* ₹${Number(item.security_deposit || 0).toLocaleString('en-IN')}\n` : '') +
-            (Number(item.balance_amount || 0) <= 0 ? '✅ *Balance Due:* ₹0 (Paid in Full)\n\n' : `⚠️ *Balance Due:* ₹${Number(item.balance_amount || 0).toLocaleString('en-IN')}\n\n`) +
-            `📍 *${shopName}*\nPlease present this receipt during pickup.`
-          );
-          const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(textToSend)}`;
-          window.open(waUrl, '_blank');
-          showToast('Opening WhatsApp with e-bill...', 'neutral');
-        }
-      } catch (err) {
-        waCardBtn.disabled = false;
-        waCardBtn.innerHTML = origHtml;
-        showToast('WhatsApp send error: ' + err.message, 'error');
-      }
     });
   }
 

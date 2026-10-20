@@ -43,6 +43,10 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     ? Number(article.balance_amount)
     : Math.max(0, numPrice - numAdvance);
 
+  const cleanTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
+    ? article.title
+    : (article.category || 'Bridal');
+
   const modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
 
@@ -127,46 +131,10 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
             type="text"
             id="edit-title"
             class="input-field"
-            value="${escapeHtml(article.title || '')}"
-            placeholder="e.g. Royal Maroon Velvet Zardozi Lehenga"
+            value="${escapeHtml(cleanTitle)}"
+            placeholder="e.g. Bridal"
             required
           />
-        </div>
-
-        <!-- Row: Color, Size & Salesman -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px;">
-          <div>
-            <label class="input-label" for="edit-color">Color</label>
-            <input
-              type="text"
-              id="edit-color"
-              class="input-field"
-              value="${escapeHtml(article.color || '')}"
-              placeholder="e.g. Crimson Red"
-            />
-          </div>
-          <div>
-            <label class="input-label" for="edit-size">Size</label>
-            <input
-              type="text"
-              id="edit-size"
-              class="input-field"
-              value="${escapeHtml(article.size || 'Free Size')}"
-              placeholder="e.g. Free Size, XL"
-            />
-          </div>
-          <div>
-            <label class="input-label" for="edit-salesman-name">Booked By Staff</label>
-            <input
-              type="text"
-              id="edit-salesman-name"
-              class="input-field"
-              list="edit-salesmen-list"
-              value="${escapeHtml(article.salesman_name || '')}"
-              placeholder="Sales staff name"
-            />
-            <datalist id="edit-salesmen-list"></datalist>
-          </div>
         </div>
 
         <!-- Payment Breakdown Card -->
@@ -322,17 +290,6 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     </div>
   `;
 
-  // Pre-load salesmen list into datalist
-  api.getSalesmen().then((res) => {
-    if (res?.success && Array.isArray(res.salesmen)) {
-      const datalist = modalEl.querySelector('#edit-salesmen-list');
-      if (datalist) {
-        datalist.innerHTML = res.salesmen
-          .map((s) => `<option value="${escapeHtml(s.name)}"></option>`)
-          .join('');
-      }
-    }
-  }).catch(() => {});
 
   // Close buttons
   const closeBtn = modalEl.querySelector('.close-btn');
@@ -409,6 +366,17 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     btnChangePhoto.innerHTML = `${renderIcon('upload', { size: 14 })} Choose Replacement Photo`;
   });
 
+  // Sync title field with Collection Category
+  const editCatSelect = modalEl.querySelector('#edit-category');
+  const editTitleInput = modalEl.querySelector('#edit-title');
+  const standardCategories = ['Bridal', 'Reception', 'Jewellery', 'Casual'];
+  editCatSelect.addEventListener('change', () => {
+    const cur = editTitleInput.value.trim();
+    if (!cur || standardCategories.includes(cur)) {
+      editTitleInput.value = editCatSelect.value;
+    }
+  });
+
   // Form Submit Handler
   const form = modalEl.querySelector('#edit-article-form');
   const saveBtn = modalEl.querySelector('#btn-save-edit');
@@ -430,17 +398,17 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     saveBtn.disabled = true;
     saveBtn.innerHTML = `${renderIcon('loader', { size: 16, className: 'spinner-icon' })} Saving Changes...`;
 
+    const editCategoryVal = modalEl.querySelector('#edit-category').value;
+    const editTitleVal = modalEl.querySelector('#edit-title').value.trim() || editCategoryVal;
+
     const payload = {
       article_id: updatedId,
-      title: modalEl.querySelector('#edit-title').value.trim(),
-      category: modalEl.querySelector('#edit-category').value,
+      title: editTitleVal,
+      category: editCategoryVal,
       price: price,
       advance_amount: advance,
       security_deposit: deposit,
       balance_amount: balance,
-      color: modalEl.querySelector('#edit-color').value.trim(),
-      size: modalEl.querySelector('#edit-size').value.trim(),
-      salesman_name: modalEl.querySelector('#edit-salesman-name').value.trim() || 'Studio Desk',
       customer_name: modalEl.querySelector('#edit-cust-name').value.trim(),
       customer_phone: modalEl.querySelector('#edit-cust-phone').value.trim(),
       customer_address: modalEl.querySelector('#edit-cust-addr').value.trim(),

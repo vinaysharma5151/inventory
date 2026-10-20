@@ -9,11 +9,10 @@
  * 5. Establishes the real-time Server-Sent Events (SSE) connection for zero-latency live sync.
  */
 
-import { api } from './api.js?v=6';
+import { api } from './api.js?v=11';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js?v=8';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=11';
 import { createMobileBookingView } from './views/mobileBookingView.js';
-import { renderFirstRunGatekeeper } from './modals/firstRunSetupModal.js';
 import { openLoginModal } from './modals/loginModal.js';
 
 class App {
@@ -74,25 +73,7 @@ class App {
         }
       } catch (_) {}
 
-      // Check if first-time studio setup has already been completed
-      try {
-        const setupStatus = await api.getSetupStatus();
-        if (setupStatus && setupStatus.success && !setupStatus.is_completed) {
-          localStorage.removeItem('bhavi_shop_name');
-          renderFirstRunGatekeeper(this.rootEl, {
-            currentName: setupStatus.shop_name || 'Mehak Bridal Studio',
-            onUnlock: async (configuredShopName) => {
-              this.shopName = configuredShopName;
-              await this.launchMainApp();
-            }
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('Could not check setup status:', err);
-      }
-
-      // Setup is already completed: open app immediately
+      // Open app immediately
       await this.loadSettings();
       await this.launchMainApp();
     } catch (err) {
@@ -213,24 +194,39 @@ class App {
   }
 
   /**
-   * Subscribes to backend SSE stream (/api/events) for zero-latency live sync.
+   * Subscribes to backend SSE stream (/api/events) and BroadcastChannel for zero-latency live sync.
    */
   initRealtimeSync() {
     if (this.sseUnsubscribe) {
       this.sseUnsubscribe();
       this.sseUnsubscribe = null;
     }
-    this.sseUnsubscribe = api.subscribeEvents((event) => {
-      if (event.type === 'NEW_ARTICLE' && event.article) {
-        playLiveSyncChime();
-        showToast(
-          `✨ New Mobile Booking: ${event.article.article_id} (${event.article.customer_name || 'Guest'})`,
-          'success'
-        );
+    if (this.fallbackPollTimer) {
+      clearInterval(this.fallbackPollTimer);
+      this.fallbackPollTimer = null;
+    }
 
+    this.sseUnsubscribe = api.subscribeEvents((event) => {
+      if (event.type === 'SYNC_CONNECTED') {
+        if (this.activeViewController?.setSyncStatus) {
+          this.activeViewController.setSyncStatus('connected');
+        }
+      } else if (event.type === 'SYNC_DISCONNECTED') {
+        if (this.activeViewController?.setSyncStatus) {
+          this.activeViewController.setSyncStatus('disconnected');
+        }
+      } else if (event.type === 'NEW_ARTICLE' && event.article) {
         if (!this.articles.some((a) => a.id === event.article.id)) {
           this.articles = [event.article, ...this.articles];
-          if (this.activeViewController?.updateArticles) {
+          playLiveSyncChime();
+          showToast(
+            `✨ New Mobile Booking: ${event.article.article_id} (${event.article.customer_name || 'Guest'})`,
+            'success'
+          );
+
+          if (this.activeViewController?.addNewArticle) {
+            this.activeViewController.addNewArticle(event.article);
+          } else if (this.activeViewController?.updateArticles) {
             this.activeViewController.updateArticles(this.articles);
           }
         }
@@ -252,6 +248,26 @@ class App {
         }
       }
     });
+
+    // Fail-safe background polling every 4 seconds in case of local network drops
+    this.fallbackPollTimer = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await api.getArticles();
+        if (res.success && Array.isArray(res.articles)) {
+          const knownIds = new Set(this.articles.map((a) => a.id));
+          const incoming = res.articles.filter((a) => !knownIds.has(a.id));
+          if (incoming.length > 0) {
+            this.articles = res.articles;
+            incoming.forEach((art) => {
+              if (this.activeViewController?.addNewArticle) {
+                this.activeViewController.addNewArticle(art);
+              }
+            });
+          }
+        }
+      } catch (_) {}
+    }, 4000);
   }
 }
 

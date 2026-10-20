@@ -8,15 +8,15 @@
  * - ./api/articlesApi.js: Inventory, image uploads, dues clearout, and article CRUD
  * - ./api/salesmenApi.js: Staff accounts and instant login
  * - ./api/whatsappApi.js: WhatsApp cloud gateway and e-bill sending
- * - ./api/systemApi.js: Network discovery, settings, updates, backups, and live SSE sync
+ * - ./api/systemApi.js: Network discovery, settings, backups, and live SSE sync
  */
 
-import { API_BASE, request } from './api/client.js?v=6';
-import { authApi } from './api/authApi.js?v=6';
-import { articlesApi } from './api/articlesApi.js?v=6';
-import { salesmenApi } from './api/salesmenApi.js?v=6';
-import { whatsappApi } from './api/whatsappApi.js?v=6';
-import { systemApi } from './api/systemApi.js?v=6';
+import { API_BASE, request } from './api/client.js?v=11';
+import { authApi } from './api/authApi.js?v=11';
+import { articlesApi } from './api/articlesApi.js?v=11';
+import { salesmenApi } from './api/salesmenApi.js?v=11';
+import { whatsappApi } from './api/whatsappApi.js?v=11';
+import { systemApi } from './api/systemApi.js?v=11';
 
 // Unified composite API object preserving complete backward compatibility
 export const api = {

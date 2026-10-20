@@ -79,8 +79,6 @@ CREATE TABLE IF NOT EXISTS articles (
     security_deposit REAL    DEFAULT 0,
     advance_amount   REAL    DEFAULT 0,
     balance_amount   REAL    DEFAULT 0,
-    color            TEXT    DEFAULT 'Red',
-    size             TEXT    DEFAULT 'Free Size',
     notes            TEXT,
     image_path       TEXT    NOT NULL,
     source           TEXT    DEFAULT 'phone',
@@ -102,18 +100,11 @@ CREATE INDEX IF NOT EXISTS idx_articles_pickup_date ON articles(pickup_date);
 CREATE INDEX IF NOT EXISTS idx_articles_return_date ON articles(return_date);
 CREATE INDEX IF NOT EXISTS idx_articles_customer    ON articles(customer_name);
 
-CREATE TABLE IF NOT EXISTS salesmen (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    name          TEXT    NOT NULL UNIQUE,
-    password_hash TEXT    NOT NULL,
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE,
     password_hash TEXT    NOT NULL,
-    role          TEXT    NOT NULL, -- 'owner' or 'staff'
+    role          TEXT    NOT NULL, -- 'owner'
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -182,12 +173,32 @@ def init_db() -> None:
     db = get_db()
     db.executescript(_SCHEMA)
 
+    # Clean up legacy staff functions from database
+    db.execute("DROP TABLE IF EXISTS salesmen")
+    db.execute("DELETE FROM users WHERE role = 'staff'")
+
     # Migrate: add missing columns to existing databases
     existing_cols = {row[1] for row in db.execute("PRAGMA table_info(articles)")}
     for col, col_type in _MIGRATE_COLUMNS.items():
         if col not in existing_cols:
             db.execute(f"ALTER TABLE articles ADD COLUMN {col} {col_type}")
             print(f"[DB MIGRATE] Added column: {col}")
+
+    # Migrate: drop obsolete color and size columns if present
+    if "color" in existing_cols:
+        try:
+            db.execute("ALTER TABLE articles DROP COLUMN color")
+            print("[DB MIGRATE] Dropped column: color")
+        except Exception as e:
+            print(f"[DB MIGRATE] Note on dropping color: {e}")
+
+    if "size" in existing_cols:
+        try:
+            db.execute("ALTER TABLE articles DROP COLUMN size")
+            print("[DB MIGRATE] Dropped column: size")
+        except Exception as e:
+            print(f"[DB MIGRATE] Note on dropping size: {e}")
+
     db.commit()
 
     # Ensure default shop_name is set to Mehak Bridal Studio
@@ -195,24 +206,13 @@ def init_db() -> None:
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('shop_name', 'Mehak Bridal Studio')"
     )
 
-    # Ensure default GitHub repository for software updates
+    # Ensure first-time setup is marked as completed
     db.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('github_repo', 'vinaysharma5151/inventory')"
+        "INSERT OR IGNORE INTO settings (key, value) VALUES ('first_time_setup_completed', 'true')"
     )
 
     # Prune expired sessions on startup
     db.execute("DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP")
-
-    # Sync legacy salesmen into users table with 'staff' role if not already present
-    salesmen_rows = db.execute("SELECT name, password_hash FROM salesmen").fetchall()
-    for s in salesmen_rows:
-        user_row = db.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (s["name"],)).fetchone()
-        if not user_row:
-            db.execute(
-                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'staff')",
-                (s["name"], s["password_hash"]),
-            )
-
     db.commit()
 
 

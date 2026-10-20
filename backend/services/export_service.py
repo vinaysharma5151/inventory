@@ -41,19 +41,26 @@ def generate_inventory_csv_response() -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_ALL)
     writer.writerow([
-        "ID", "Article ID", "Title / Description", "Category", "Salesman",
+        "ID", "Article ID", "Title / Description", "Category",
         "Customer Name", "Customer Phone", "Customer Address", "Pickup Date", "Return Date", "Booking Date",
-        "Rental Price (₹)", "Advance (₹)", "Balance (₹)", "Security Deposit (₹)", "Color", "Size",
+        "Rental Price (₹)", "Advance (₹)", "Balance (₹)",
         "Notes", "Image URL", "Created Date",
     ])
     for r in rows:
         a = dict(r)
+        raw_t = str(a.get("title") or "").strip()
+        cust_n = str(a.get("customer_name") or "").strip()
+        cat_n = str(a.get("category") or "Bridal").strip() or "Bridal"
+        if not raw_t or raw_t.startswith("Booking –") or raw_t.startswith("Booking -") or (cust_n and raw_t.lower() == cust_n.lower()):
+            clean_t = cat_n
+        else:
+            clean_t = raw_t
+
         writer.writerow([
             sanitize_csv_cell(a["id"]),
             sanitize_csv_cell(a["article_id"]),
-            sanitize_csv_cell(a.get("title")),
-            sanitize_csv_cell(a.get("category")),
-            sanitize_csv_cell(a.get("salesman_name") or "N/A"),
+            sanitize_csv_cell(clean_t),
+            sanitize_csv_cell(cat_n),
             sanitize_csv_cell(a.get("customer_name") or "N/A"),
             sanitize_csv_cell(a.get("customer_phone") or "N/A"),
             sanitize_csv_cell(a.get("customer_address") or "N/A"),
@@ -63,9 +70,6 @@ def generate_inventory_csv_response() -> StreamingResponse:
             sanitize_csv_cell(a.get("price")),
             sanitize_csv_cell(a.get("advance_amount")),
             sanitize_csv_cell(a.get("balance_amount")),
-            sanitize_csv_cell(a.get("security_deposit")),
-            sanitize_csv_cell(a.get("color")),
-            sanitize_csv_cell(a.get("size")),
             sanitize_csv_cell(a.get("notes")),
             sanitize_csv_cell(a.get("image_path")),
             sanitize_csv_cell(a.get("created_at")),

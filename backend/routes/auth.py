@@ -54,25 +54,6 @@ def login(body: LoginRequest, request: Request, response: Response):
         (username,),
     ).fetchone()
 
-    # Fallback check on salesmen table if not yet synchronized
-    if not user_row:
-        salesman_row = db.execute(
-            "SELECT id, name, password_hash FROM salesmen WHERE LOWER(name) = LOWER(?)",
-            (username,),
-        ).fetchone()
-        if salesman_row and verify_password(body.password, salesman_row["password_hash"]):
-            # Synchronize into users table
-            hashed = hash_password(body.password)
-            db.execute(
-                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'staff')",
-                (salesman_row["name"], hashed),
-            )
-            db.commit()
-            user_row = db.execute(
-                "SELECT id, username, password_hash, role FROM users WHERE LOWER(username) = LOWER(?)",
-                (username,),
-            ).fetchone()
-
     if not user_row or not verify_password(body.password, user_row["password_hash"]):
         record_login_failure(db, identifier)
         log_audit_event(

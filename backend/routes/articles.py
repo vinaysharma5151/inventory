@@ -30,7 +30,6 @@ from backend.services.auth import (
 )
 from backend.services.export_service import generate_inventory_csv_response
 from backend.services.image_service import save_article_image
-from backend.services.whatsapp import send_booking_ebill_task
 from backend.sse import broadcast
 
 router = APIRouter()
@@ -73,10 +72,9 @@ def list_articles(
             title LIKE ? OR
             customer_name LIKE ? OR
             customer_phone LIKE ? OR
-            salesman_name LIKE ? OR
-            color LIKE ?
+            salesman_name LIKE ?
         )"""
-        params.extend([search_pattern] * 6)
+        params.extend([search_pattern] * 5)
 
     if category and category.lower() != "all":
         query += " AND category = ?"
@@ -123,8 +121,6 @@ async def create_article(
     security_deposit: Optional[float] = Form(0),
     advance_amount:   Optional[float] = Form(0),
     balance_amount:   Optional[str]   = Form(None),
-    color:            Optional[str]   = Form("Standard"),
-    size:             Optional[str]   = Form("Free Size"),
     notes:            Optional[str]   = Form(""),
     source:           Optional[str]   = Form("phone"),
     customer_name:    Optional[str]   = Form(None),
@@ -164,23 +160,34 @@ async def create_article(
 
     creator_name = (salesman_name or "").strip() or current_user.get("username", "Staff")
 
+    category_val = (category or "Bridal").strip() or "Bridal"
+    cust_name_clean = (customer_name or "").strip()
+    title_clean = (title or "").strip()
+    if (
+        not title_clean
+        or title_clean.startswith("Booking –")
+        or title_clean.startswith("Booking -")
+        or (cust_name_clean and title_clean.lower() == cust_name_clean.lower())
+    ):
+        final_title = category_val
+    else:
+        final_title = title_clean
+
     db.execute(
         """INSERT INTO articles
            (article_id, title, category, price, security_deposit,
-            advance_amount, balance_amount, color, size, notes,
+            advance_amount, balance_amount, notes,
             image_path, source, customer_name, customer_phone, customer_address,
             pickup_date, booking_date, return_date, salesman_name)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             final_id,
-            title or f"Booking – {final_id}",
-            category or "Bridal",
+            final_title,
+            category_val,
             price_f,
             max(0.0, float(security_deposit or 0)),
             advance_f,
             balance_f,
-            color or "Standard",
-            size or "Free Size",
             notes or "",
             image_path,
             source or "phone",
@@ -211,10 +218,6 @@ async def create_article(
 
     await broadcast("NEW_ARTICLE", article)
 
-    # Automatically dispatch WhatsApp e-bill if customer phone is provided
-    if article.get("customer_phone"):
-        asyncio.create_task(send_booking_ebill_task(article))
-
     return {
         "success": True,
         "message": "Article and photo saved successfully to showroom database!",
@@ -242,7 +245,7 @@ async def update_article(
 
     allowed = {
         "article_id", "title", "category", "price", "security_deposit",
-        "advance_amount", "balance_amount", "color", "size", "notes",
+        "advance_amount", "balance_amount", "notes",
         "customer_name", "customer_phone", "customer_address", "pickup_date", "booking_date",
         "return_date", "salesman_name",
     }
@@ -270,6 +273,21 @@ async def update_article(
                 detail=f"Article code '{new_aid}' is already in use by another piece.",
             )
         updates["article_id"] = new_aid
+
+    # Ensure Garment Title contains Collection Category and not customer name
+    if "title" in updates:
+        t_clean = str(updates["title"] or "").strip()
+        c_clean = str(updates.get("category", existing.get("category") or "Bridal")).strip() or "Bridal"
+        cust_clean = str(updates.get("customer_name", existing.get("customer_name") or "")).strip()
+        if (
+            not t_clean
+            or t_clean.startswith("Booking –")
+            or t_clean.startswith("Booking -")
+            or (cust_clean and t_clean.lower() == cust_clean.lower())
+        ):
+            updates["title"] = c_clean
+        else:
+            updates["title"] = t_clean
 
     # If price or advance were updated, enforce server-side balance calculation
     new_price = float(updates.get("price", existing.get("price", 0)))
@@ -409,10 +427,6 @@ async def clear_dues(
     )
 
     await broadcast("UPDATE_ARTICLE", updated)
-
-    # Automatically dispatch updated WhatsApp receipt showing balance cleared
-    if updated.get("customer_phone"):
-        asyncio.create_task(send_booking_ebill_task(updated))
 
     return {
         "success": True,

@@ -14,8 +14,6 @@ import { initMobileCamera } from './mobile/mobileCamera.js';
 import { initPaymentCalculator } from './mobile/paymentCalculator.js';
 import { initSubmitOverlay } from './mobile/mobileSubmitOverlay.js';
 
-const SESSION_KEY = 'sv_salesman_session';
-
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -32,31 +30,6 @@ const getISODate = (offsetDays = 0) => {
 };
 
 export function createMobileBookingView(containerEl, state) {
-  let salesman = null;
-  try {
-    salesman = JSON.parse(sessionStorage.getItem(SESSION_KEY));
-  } catch (_) {
-    salesman = null;
-  }
-
-  if (!salesman && state.currentUser) {
-    salesman = {
-      id: state.currentUser.id,
-      name: state.currentUser.username,
-      role: state.currentUser.role,
-    };
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(salesman));
-    } catch (_) {}
-  }
-
-  if (!salesman) {
-    salesman = { id: 1, name: 'Staff', role: 'staff' };
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(salesman));
-    } catch (_) {}
-  }
-
   let shopName = state.shopName || 'Mehak Bridal Studio';
   let category = 'Bridal';
   let pickupDate = getISODate(2);
@@ -82,13 +55,6 @@ export function createMobileBookingView(containerEl, state) {
                 <span>Studio Live Sync</span>
               </div>
             </div>
-          </div>
-
-          <div class="mobile-header-actions">
-            <span class="mobile-salesman-tag">👤 ${escapeHtml(salesman?.name || 'Staff')}</span>
-            <button type="button" id="btn-mobile-logout" class="btn btn-ghost btn-icon-only" title="Logout">
-              ${renderIcon('logout', { size: 16 })}
-            </button>
           </div>
         </header>
 
@@ -303,19 +269,6 @@ export function createMobileBookingView(containerEl, state) {
     const priceInput = containerEl.querySelector('#m-price-input');
     const submitBtn = containerEl.querySelector('#btn-submit-booking');
     const submitLabel = containerEl.querySelector('#m-submit-label');
-    const logoutBtn = containerEl.querySelector('#btn-mobile-logout');
-
-    // Switch Staff Name
-    logoutBtn.addEventListener('click', () => {
-      const newName = prompt('Enter Staff / Salesperson Name:', salesman ? salesman.name : 'Staff');
-      if (newName && newName.trim()) {
-        salesman = { id: 1, name: newName.trim(), role: 'staff' };
-        try {
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify(salesman));
-        } catch (_) {}
-        renderMain();
-      }
-    });
 
     // Initialize Subcomponents
     cameraController = initMobileCamera(containerEl, {
@@ -428,7 +381,7 @@ export function createMobileBookingView(containerEl, state) {
       const formData = new FormData();
       formData.append('photo', photoBlob, `${finalId}.jpg`);
       formData.append('article_id', finalId);
-      formData.append('title', `Booking – ${name}`);
+      formData.append('title', category || 'Bridal');
       formData.append('category', category);
       formData.append('price', p);
       formData.append('advance_amount', adv);
@@ -440,7 +393,7 @@ export function createMobileBookingView(containerEl, state) {
       formData.append('return_date', returnInput.value);
       formData.append('booking_date', getISODate(0));
       formData.append('source', 'phone');
-      formData.append('salesman_name', salesman?.name || 'Mobile Staff');
+      formData.append('salesman_name', 'Studio');
 
       try {
         const res = await api.uploadArticle(formData);

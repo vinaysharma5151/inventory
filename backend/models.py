@@ -22,8 +22,6 @@ class ArticleUpdate(BaseModel):
     security_deposit: Optional[float] = None
     advance_amount:   Optional[float] = None
     balance_amount:   Optional[float] = None
-    color:            Optional[str]   = None
-    size:             Optional[str]   = None
     notes:            Optional[str]   = None
     customer_name:    Optional[str]   = None
     customer_phone:   Optional[str]   = None

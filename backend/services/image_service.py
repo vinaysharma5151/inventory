@@ -71,8 +71,8 @@ def save_article_image(file: UploadFile, article_id: str) -> str:
         if max(img.width, img.height) > MAX_MEDIUM_DIMENSION:
             img.thumbnail((MAX_MEDIUM_DIMENSION, MAX_MEDIUM_DIMENSION), Image.Resampling.LANCZOS)
 
-        # Save freshly re-encoded JPEG with zero EXIF/metadata
-        img.save(dest, format="JPEG", quality=MEDIUM_JPEG_QUALITY, optimize=True)
+        # Save freshly re-encoded JPEG with zero EXIF/metadata (fast sub-10ms encode)
+        img.save(dest, format="JPEG", quality=MEDIUM_JPEG_QUALITY)
     except HTTPException:
         raise
     except Exception:

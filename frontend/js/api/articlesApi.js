@@ -58,6 +58,14 @@ export const articlesApi = {
     if (!res.ok || !data.success) {
       throw new Error(data.detail || data.message || data.error || 'Failed to save article');
     }
+    // Instant same-origin cross-tab sync via BroadcastChannel
+    try {
+      if (typeof window !== 'undefined' && window.BroadcastChannel && data.article) {
+        const bc = new BroadcastChannel('studio_live_sync');
+        bc.postMessage({ type: 'NEW_ARTICLE', article: data.article });
+        bc.close();
+      }
+    } catch (_) {}
     return data;
   },
 

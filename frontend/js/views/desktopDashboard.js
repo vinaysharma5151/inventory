@@ -13,7 +13,7 @@ import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
 import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=9';
 import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=8';
-import { createArticleCard } from './desktop/articleCard.js?v=9';
+import { createArticleCard } from './desktop/articleCard.js?v=10';
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];
@@ -47,7 +47,7 @@ export function createDesktopDashboard(containerEl, state) {
               type="text"
               id="dashboard-search-input"
               class="search-input"
-              placeholder="Search by Article ID (e.g. 0001), Customer, or Salesman..."
+              placeholder="Search by Article ID (e.g. 0001), Customer, or Phone..."
             />
           </div>
 
@@ -103,6 +103,9 @@ export function createDesktopDashboard(containerEl, state) {
           <!-- Dynamic Date Picker Subbar -->
           <div id="date-picker-subbar" class="date-picker-subbar" style="display: none;"></div>
         </section>
+
+        <!-- Live Sync Alert Slot -->
+        <div id="live-sync-alert-slot"></div>
 
         <!-- Grid Container -->
         <section id="articles-grid-container" class="articles-cards-grid"></section>
@@ -303,10 +306,95 @@ export function createDesktopDashboard(containerEl, state) {
     renderGrid();
   });
 
+  // Helper to visually highlight a newly arrived article card
+  const highlightCard = (articleId) => {
+    const cardMedia = gridContainer.querySelector(`.article-card-media[data-id="${articleId}"]`);
+    if (!cardMedia) return;
+    const cardEl = cardMedia.closest('.article-studio-card');
+    if (!cardEl) return;
+
+    cardEl.classList.remove('just-arrived');
+    // Force reflow
+    void cardEl.offsetWidth;
+    cardEl.classList.add('just-arrived');
+
+    const tagContainer = cardEl.querySelector('.card-top-tags');
+    if (tagContainer && !tagContainer.querySelector('.badge-live-in')) {
+      const livePill = document.createElement('span');
+      livePill.className = 'badge badge-live-in font-mono';
+      livePill.textContent = '⚡ LIVE JUST IN';
+      tagContainer.prepend(livePill);
+      setTimeout(() => {
+        livePill.style.transition = 'opacity 0.6s ease';
+        livePill.style.opacity = '0';
+        setTimeout(() => livePill.remove(), 600);
+      }, 9000);
+    }
+
+    cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  // Helper to clear filters and show all articles
+  const resetAllFilters = () => {
+    filterState.searchQuery = '';
+    filterState.selectedCategory = 'all';
+    filterState.paymentFilter = 'all';
+    filterState.datePreset = 'all';
+    filterState.filterMonth = '';
+    filterState.filterSpecificDate = '';
+    filterState.filterRangeStart = '';
+    filterState.filterRangeEnd = '';
+
+    if (searchInput) searchInput.value = '';
+    catChips.forEach((b) => b.classList.toggle('active', b.dataset.cat === 'all'));
+    payChips.forEach((b) => {
+      b.classList.toggle('active', b.dataset.pay === 'all');
+      b.classList.remove('due', 'paid');
+    });
+    datePresets.forEach((b) => b.classList.toggle('active', b.dataset.preset === 'all'));
+    if (btnClearDate) btnClearDate.style.display = 'none';
+
+    renderDateSubbar();
+    renderGrid();
+  };
+
   // Initial Grid Render
   renderGrid();
 
   return {
+    addNewArticle(newArt) {
+      if (!newArt || !newArt.id) return;
+      if (articles.some((a) => a.id === newArt.id)) return;
+
+      articles = [newArt, ...articles];
+
+      // Check if new article matches active filter
+      const matches = filterArticles([newArt], filterState).length > 0;
+      const alertSlot = containerEl.querySelector('#live-sync-alert-slot');
+
+      if (matches) {
+        if (alertSlot) alertSlot.innerHTML = '';
+        renderGrid();
+        highlightCard(newArt.id);
+      } else if (alertSlot) {
+        alertSlot.innerHTML = `
+          <div class="new-article-sync-banner">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="live-pulse-dot"></span>
+              <span><strong>⚡ New Mobile Capture:</strong> ${newArt.article_id} (${newArt.customer_name || 'Guest'}) in ${newArt.category || 'Collection'}</span>
+            </div>
+            <button type="button" class="btn btn-gold btn-sm" id="btn-show-live-art" style="padding: 4px 12px; font-size: 0.8rem;">
+              Show Now
+            </button>
+          </div>
+        `;
+        alertSlot.querySelector('#btn-show-live-art')?.addEventListener('click', () => {
+          alertSlot.innerHTML = '';
+          resetAllFilters();
+          highlightCard(newArt.id);
+        });
+      }
+    },
     updateArticles(newArticles) {
       articles = newArticles;
       renderGrid();
@@ -315,6 +403,22 @@ export function createDesktopDashboard(containerEl, state) {
       shopName = newName;
       const brandTitle = containerEl.querySelector('#brand-shop-name');
       if (brandTitle) brandTitle.textContent = newName;
+    },
+    setSyncStatus(status) {
+      const syncEl = containerEl.querySelector('.live-sync-indicator');
+      const pulseDot = containerEl.querySelector('.live-pulse-dot');
+      if (!syncEl || !pulseDot) return;
+      if (status === 'connected') {
+        syncEl.classList.remove('sync-warning');
+        syncEl.title = 'Connected to studio real-time event bus';
+        const label = syncEl.querySelector('span:not(.live-pulse-dot)');
+        if (label) label.textContent = 'Studio Live Sync';
+      } else if (status === 'disconnected') {
+        syncEl.classList.add('sync-warning');
+        syncEl.title = 'Reconnecting to server...';
+        const label = syncEl.querySelector('span:not(.live-pulse-dot)');
+        if (label) label.textContent = 'Reconnecting...';
+      }
     }
   };
 }

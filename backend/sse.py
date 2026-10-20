@@ -39,6 +39,12 @@ async def broadcast(event: str, data: Any) -> None:
         try:
             q.put_nowait(payload)
         except asyncio.QueueFull:
+            try:
+                q.get_nowait()
+                q.put_nowait(payload)
+            except Exception:
+                dead.append(q)
+        except Exception:
             dead.append(q)
     for q in dead:
         _clients.discard(q)

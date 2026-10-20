@@ -89,16 +89,10 @@ export function openAddArticleModal(onCreated) {
           </div>
         </div>
 
-        <!-- Title & Color -->
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
-          <div>
-            <label class="input-label" for="add-title">Garment Title / Description *</label>
-            <input type="text" id="add-title" class="input-field" placeholder="e.g. Royal Maroon Velvet Zardozi Lehenga" required />
-          </div>
-          <div>
-            <label class="input-label" for="add-color">Color</label>
-            <input type="text" id="add-color" class="input-field" placeholder="e.g. Crimson Red" value="Crimson Red" />
-          </div>
+        <!-- Title -->
+        <div>
+          <label class="input-label" for="add-title">Garment Title / Description *</label>
+          <input type="text" id="add-title" class="input-field" value="Bridal" placeholder="e.g. Bridal" required />
         </div>
 
         <!-- Price & Advance -->
@@ -182,6 +176,17 @@ export function openAddArticleModal(onCreated) {
   fetchNext();
   refreshIdBtn.addEventListener('click', fetchNext);
 
+  // Sync title field with Collection Category
+  const categorySelect = modalEl.querySelector('#add-category');
+  const titleInput = modalEl.querySelector('#add-title');
+  const standardCategories = ['Bridal', 'Reception', 'Jewellery', 'Casual'];
+  categorySelect.addEventListener('change', () => {
+    const cur = titleInput.value.trim();
+    if (!cur || standardCategories.includes(cur)) {
+      titleInput.value = categorySelect.value;
+    }
+  });
+
   // Photo dropzone handling
   const dropzone = modalEl.querySelector('#add-photo-dropzone');
   const fileInput = modalEl.querySelector('#add-photo-file-input');
@@ -235,12 +240,13 @@ export function openAddArticleModal(onCreated) {
     const formData = new FormData();
     formData.append('photo', photoBlob, `${finalId}.jpg`);
     formData.append('article_id', finalId);
-    formData.append('title', modalEl.querySelector('#add-title').value.trim());
-    formData.append('category', modalEl.querySelector('#add-category').value);
+    const categoryVal = modalEl.querySelector('#add-category').value;
+    const titleVal = modalEl.querySelector('#add-title').value.trim() || categoryVal;
+    formData.append('title', titleVal);
+    formData.append('category', categoryVal);
     formData.append('price', price);
     formData.append('advance_amount', advance);
     formData.append('balance_amount', balance);
-    formData.append('color', modalEl.querySelector('#add-color').value.trim());
     formData.append('customer_name', modalEl.querySelector('#add-customer-name').value.trim());
     formData.append('customer_phone', modalEl.querySelector('#add-customer-phone').value.trim());
     formData.append('pickup_date', modalEl.querySelector('#add-pickup-date').value);
@@ -252,11 +258,7 @@ export function openAddArticleModal(onCreated) {
     try {
       const res = await api.uploadArticle(formData);
       if (res.success) {
-        if (formData.get('customer_phone')) {
-          showToast(`Article ${finalId} added & WhatsApp e-bill dispatched!`, 'success');
-        } else {
-          showToast(`Article ${finalId} added!`, 'success');
-        }
+        showToast(`Article ${finalId} added!`, 'success');
         if (photoUrl) URL.revokeObjectURL(photoUrl);
         closeModal();
         if (onCreated) onCreated(res.article);

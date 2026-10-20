@@ -344,6 +344,10 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
   const printTime = formatDisplayTime(now);
   const barcodeSvg = generateCode39Svg(article.article_id || '0001');
 
+  const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
+    ? article.title
+    : (article.category || 'Bridal');
+
   return `
     <div class="thermal-receipt">
       <!-- Atelier Header -->
@@ -354,9 +358,6 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
         <div class="receipt-meta-grid">
           <span><strong>Bill No:</strong> #${escapeHtml(article.article_id || '0001')}</span>
           <span><strong>Date:</strong> ${printDate}</span>
-        </div>
-        <div class="receipt-meta-grid">
-          <span><strong>Staff:</strong> ${escapeHtml(article.salesman_name || 'Studio Desk')}</span>
           <span><strong>Time:</strong> ${printTime}</span>
         </div>
       </div>
@@ -394,18 +395,12 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
         </div>
         <div class="receipt-row">
           <span class="receipt-label">ITEM:</span>
-          <span class="receipt-val bold">${escapeHtml(article.title || 'Designer Bridal Lehenga')}</span>
+          <span class="receipt-val bold">${escapeHtml(displayTitle)}</span>
         </div>
         <div class="receipt-row">
           <span class="receipt-label">COLLECTION:</span>
           <span class="receipt-val">${escapeHtml(article.category || 'Bridal')}</span>
         </div>
-        ${(article.color || article.size) ? `
-          <div class="receipt-row">
-            <span class="receipt-label">COLOR / SIZE:</span>
-            <span class="receipt-val">${escapeHtml([article.color, article.size].filter(Boolean).join(' / '))}</span>
-          </div>
-        ` : ''}
 
         <div class="receipt-dates-box">
           ${article.booking_date ? `

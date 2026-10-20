@@ -42,6 +42,10 @@ export function openClearoutModal(article, onSuccess) {
     return;
   }
 
+  const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
+    ? article.title
+    : (article.category || 'Bridal');
+
   const modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.id = 'clearout-modal-backdrop';
@@ -73,7 +77,7 @@ export function openClearoutModal(article, onSuccess) {
             onerror="this.src='/uploads/sample_LH1001.jpg'"
           />
           <div class="clearout-preview-info">
-            <h4 class="clearout-preview-title">${escapeHtml(article.title || `Designer Piece ${article.article_id}`)}</h4>
+            <h4 class="clearout-preview-title">${escapeHtml(displayTitle)}</h4>
             <div class="clearout-meta-row">
               <span class="clearout-customer-tag">👤 ${escapeHtml(article.customer_name || 'Guest')}</span>
               ${article.customer_phone ? `<span class="clearout-phone-tag">📞 ${escapeHtml(article.customer_phone)}</span>` : ''}

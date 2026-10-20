@@ -1,5 +1,5 @@
 /**
- * systemApi.js — System Settings, Network Info, Backups, Updates & Real-Time SSE.
+ * systemApi.js — System Settings, Network Info, Backups & Real-Time SSE.
  */
 
 import { API_BASE, request } from './client.js';
@@ -51,37 +51,6 @@ export const systemApi = {
   },
 
   /**
-   * Checks if an application update is available.
-   * @returns {Promise<{success: boolean, update_available: boolean, current_version: string, latest_version?: string, download_url?: string, release_notes?: string}>}
-   */
-  async checkUpdate() {
-    try {
-      const res = await request(`${API_BASE}/check-update`);
-      return res.json();
-    } catch (_) {
-      return { success: false, update_available: false, offline: true };
-    }
-  },
-
-  /**
-   * Applies an update by downloading the new .exe and restarting.
-   * @param {string} downloadUrl
-   * @returns {Promise<{success: boolean, message: string, backup_created: string}>}
-   */
-  async applyUpdate(downloadUrl) {
-    const res = await request(`${API_BASE}/apply-update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ download_url: downloadUrl })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
-      throw new Error(data.detail || data.message || 'Failed to apply update');
-    }
-    return data;
-  },
-
-  /**
    * Triggers an immediate manual database snapshot/backup.
    * @returns {Promise<{success: boolean, backup_name: string, message: string}>}
    */
@@ -102,63 +71,107 @@ export const systemApi = {
    * @returns {function} - Unsubscribe function to close the EventSource
    */
   subscribeEvents(onMessage, onError) {
-    const eventSource = new EventSource(`${API_BASE}/events`);
+    let eventSource = null;
+    let isTerminated = false;
+    let reconnectTimer = null;
+    let bc = null;
+
+    // Listen to local same-origin BroadcastChannel for 0ms same-laptop sync
+    try {
+      if (typeof window !== 'undefined' && window.BroadcastChannel) {
+        bc = new BroadcastChannel('studio_live_sync');
+        bc.onmessage = (e) => {
+          if (e.data && onMessage) {
+            onMessage(e.data);
+          }
+        };
+      }
+    } catch (_) {}
+
+    const connectSSE = () => {
+      if (isTerminated) return;
+      try {
+        eventSource = new EventSource(`${API_BASE}/events`);
+
+        eventSource.onopen = () => {
+          onMessage({ type: 'SYNC_CONNECTED' });
+        };
+
+        eventSource.addEventListener('NEW_ARTICLE', (e) => {
+          try {
+            const article = JSON.parse(e.data);
+            onMessage({ type: 'NEW_ARTICLE', article });
+          } catch (err) {
+            console.error('SSE JSON error:', err);
+          }
+        });
+
+        eventSource.addEventListener('UPDATE_ARTICLE', (e) => {
+          try {
+            const article = JSON.parse(e.data);
+            onMessage({ type: 'UPDATE_ARTICLE', article });
+          } catch (err) {
+            console.error('SSE JSON error:', err);
+          }
+        });
+
+        eventSource.addEventListener('DELETE_ARTICLE', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            onMessage({ type: 'DELETE_ARTICLE', data });
+          } catch (err) {
+            console.error('SSE JSON error:', err);
+          }
+        });
+
+        eventSource.addEventListener('SETTINGS_UPDATED', (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            onMessage({ type: 'SETTINGS_UPDATED', settings: payload.settings || payload });
+          } catch (err) {
+            console.error('SSE JSON error on settings:', err);
+          }
+        });
+
+        eventSource.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            onMessage(data);
+          } catch (_) {}
+        };
+
+        eventSource.onerror = (err) => {
+          onMessage({ type: 'SYNC_DISCONNECTED' });
+          if (onError) onError(err);
+          if (eventSource && eventSource.readyState === EventSource.CLOSED && !isTerminated) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connectSSE, 2000);
+          }
+        };
+      } catch (err) {
+        onMessage({ type: 'SYNC_DISCONNECTED' });
+        if (!isTerminated) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connectSSE, 3000);
+        }
+      }
+    };
+
+    connectSSE();
 
     const cleanup = () => {
-      try {
-        eventSource.close();
-      } catch (_) {}
+      isTerminated = true;
+      clearTimeout(reconnectTimer);
+      if (eventSource) {
+        try { eventSource.close(); } catch (_) {}
+      }
+      if (bc) {
+        try { bc.close(); } catch (_) {}
+      }
     };
 
     window.addEventListener('beforeunload', cleanup, { once: true });
     window.addEventListener('pagehide', cleanup, { once: true });
-
-    eventSource.addEventListener('NEW_ARTICLE', (e) => {
-      try {
-        const article = JSON.parse(e.data);
-        onMessage({ type: 'NEW_ARTICLE', article });
-      } catch (err) {
-        console.error('SSE JSON error:', err);
-      }
-    });
-
-    eventSource.addEventListener('UPDATE_ARTICLE', (e) => {
-      try {
-        const article = JSON.parse(e.data);
-        onMessage({ type: 'UPDATE_ARTICLE', article });
-      } catch (err) {
-        console.error('SSE JSON error:', err);
-      }
-    });
-
-    eventSource.addEventListener('DELETE_ARTICLE', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        onMessage({ type: 'DELETE_ARTICLE', data });
-      } catch (err) {
-        console.error('SSE JSON error:', err);
-      }
-    });
-
-    eventSource.addEventListener('SETTINGS_UPDATED', (e) => {
-      try {
-        const payload = JSON.parse(e.data);
-        onMessage({ type: 'SETTINGS_UPDATED', settings: payload.settings || payload });
-      } catch (err) {
-        console.error('SSE JSON error on settings:', err);
-      }
-    });
-
-    eventSource.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        onMessage(data);
-      } catch (_) {}
-    };
-
-    eventSource.onerror = (err) => {
-      if (onError) onError(err);
-    };
 
     return () => {
       cleanup();

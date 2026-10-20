@@ -34,24 +34,30 @@ function getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalanc
   const cleanPhone = article.customer_phone.replace(/\D/g, '');
   const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   const numSecurity = Number(article.security_deposit || 0);
-  const secLine = numSecurity > 0 ? `🛡️ *Security Deposit:* ₹${formatINR(numSecurity)}\n` : '';
-  const dueLine = numBalance <= 0 ? `✅ *Balance Due:* ₹0 (Paid in Full)` : `⚠️ *Balance Due:* ₹${formatINR(numBalance)}`;
-  const storeBrand = (shopName && shopName.trim()) ? shopName.trim() : 'Bridal Studio';
+  const secLine = numSecurity > 0 ? `*Security Deposit:* Rs. ${formatINR(numSecurity)}\n` : '';
+  const dueLine = numBalance <= 0 ? `*Balance Due:* Rs. 0 (Paid in Full)` : `*Balance Due:* Rs. ${formatINR(numBalance)}`;
+  const storeBrand = (shopName && shopName.trim()) ? shopName.trim() : 'Mehak Bridal Studio';
+  const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
+    ? article.title
+    : (article.category || 'Bridal');
   const text = encodeURIComponent(
     customEbillText || (
-      `🌸 *${storeBrand.toUpperCase()}* 🌸\n` +
-      `✨ *Booking Confirmation & E-Bill* ✨\n\n` +
+      `*${storeBrand.toUpperCase()}*\n` +
+      `*Booking Confirmation & E-Bill*\n` +
+      `----------------------------------------\n` +
       `Dear *${article.customer_name || 'Customer'}*,\n` +
-      `Thank you for choosing ${storeBrand}!\n\n` +
-      `🧾 *Article Code:* ${article.article_id}\n` +
-      `👗 *Outfit:* ${article.title || 'Bridal Lehenga'}\n` +
-      `📅 *Pickup Date:* ${article.pickup_date || 'N/A'}\n` +
-      `🔄 *Return Date:* ${article.return_date || 'N/A'}\n\n` +
-      `💵 *Total Rent:* ₹${formatINR(numPrice)}\n` +
-      `💳 *Advance Paid:* ₹${formatINR(numAdvance)}\n` +
+      `Thank you for choosing ${storeBrand}! Here is your booking summary:\n\n` +
+      `*Article Code:* ${article.article_id}\n` +
+      `*Outfit:* ${String(displayTitle).replace(/[–—]/g, '-')}\n` +
+      `*Pickup Date:* ${article.pickup_date || 'N/A'}\n` +
+      `*Return Date:* ${article.return_date || 'N/A'}\n\n` +
+      `*Total Rent:* Rs. ${formatINR(numPrice)}\n` +
+      `*Advance Paid:* Rs. ${formatINR(numAdvance)}\n` +
       secLine +
       `${dueLine}\n\n` +
-      `📍 *${storeBrand}*\nPlease present this receipt during pickup.`
+      `----------------------------------------\n` +
+      `*${storeBrand}*\n` +
+      `Kindly present this e-receipt or Article Code during garment pickup.`
     )
   );
   return `https://wa.me/${fullPhone}?text=${text}`;
@@ -73,6 +79,10 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     : Math.max(0, numPrice - numAdvance);
 
   const isFullyPaid = numPrice > 0 && numBalance === 0;
+
+  const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
+    ? article.title
+    : (article.category || 'Bridal');
 
   const modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
@@ -96,7 +106,7 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
         <div class="detail-photo-wrapper">
           <img
             src="${escapeHtml(article.image_path)}"
-            alt="${escapeHtml(article.title || article.article_id)}"
+            alt="${escapeHtml(displayTitle)}"
             class="detail-photo"
             onerror="this.src='/uploads/sample_LH1001.jpg'"
           />
@@ -110,11 +120,9 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
           <div>
             <div class="detail-tags-row">
               <span class="badge badge-gold">${escapeHtml(article.category || 'Bridal')}</span>
-              <span class="badge badge-neutral">Color: ${escapeHtml(article.color || 'Standard')}</span>
-              <span class="badge badge-neutral">Size: ${escapeHtml(article.size || 'Free Size')}</span>
             </div>
             <h2 class="detail-main-title">
-              ${escapeHtml(article.title || `Royal Designer Piece ${article.article_id}`)}
+              ${escapeHtml(displayTitle)}
             </h2>
           </div>
 
@@ -184,16 +192,9 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
 
             <div class="booking-card-row">
               <div class="booking-field">
-                <span class="stat-label">Booked By Staff</span>
-                <span class="field-staff-val">👤 ${escapeHtml(article.salesman_name || 'Studio Desk')}</span>
-              </div>
-              <div class="booking-field">
                 <span class="stat-label">Pickup / Delivery Date</span>
                 <span class="field-date-val">${renderIcon('calendar', { size: 14 })} ${escapeHtml(article.pickup_date || 'N/A')}</span>
               </div>
-            </div>
-
-            <div class="booking-card-row">
               <div class="booking-field">
                 <span class="stat-label">Return Date (Back to Shop)</span>
                 <span class="field-date-val field-return-val">${renderIcon('rotateCcw', { size: 14 })} ${escapeHtml(article.return_date || 'Not specified')}</span>
@@ -217,24 +218,20 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
         </div>
       </div>
 
-      <!-- Dynamic WhatsApp Feedback Container -->
-      <div id="wa-feedback-container"></div>
 
       <!-- Footer -->
       <div class="modal-footer detail-modal-footer">
         <div class="footer-actions-left">
-          ${currentUser?.role !== 'staff' ? `
-            <button type="button" class="btn btn-danger btn-sm btn-delete-article" title="Permanently Delete Piece">
-              ${renderIcon('trash', { size: 14 })} Delete Piece
-            </button>
-          ` : ''}
+          <button type="button" class="btn btn-danger btn-sm btn-delete-article" title="Permanently Delete Piece">
+            ${renderIcon('trash', { size: 14 })} Delete Piece
+          </button>
           <button type="button" class="btn btn-outline btn-sm btn-edit-detail-article" title="Edit Article Data / Fix Errors">
             ${renderIcon('edit', { size: 14 })} Edit Details
           </button>
         </div>
 
         <div class="footer-actions-right">
-          ${numBalance > 0 && currentUser?.role !== 'staff' ? `
+          ${numBalance > 0 ? `
             <button type="button" class="btn btn-clearout-footer btn-clear-dues-footer" title="Settle all dues">
               ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
             </button>
@@ -311,64 +308,16 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     }
   });
 
-  // WhatsApp bill trigger
+  // WhatsApp bill trigger (Direct WhatsApp click-to-chat via wa.me)
   const waBtn = modalEl.querySelector('.btn-send-wa');
   if (waBtn) {
-    waBtn.addEventListener('click', async () => {
-      waBtn.disabled = true;
-      waBtn.innerHTML = `${renderIcon('loader', { size: 16, className: 'spinner-icon' })} Sending...`;
-
-      const fbContainer = modalEl.querySelector('#wa-feedback-container');
-      fbContainer.innerHTML = '';
-
-      try {
-        const res = await api.sendWhatsAppBill(article.id);
-        waBtn.disabled = false;
-        waBtn.innerHTML = `${renderIcon('messageCircle', { size: 16 })} WhatsApp Bill`;
-
-        if (res.success) {
-          fbContainer.innerHTML = `
-            <div class="wa-detail-feedback success">
-              <div class="wa-feedback-text">
-                ${renderIcon('check', { size: 16 })}
-                <span>WhatsApp e-bill sent successfully!</span>
-              </div>
-            </div>
-          `;
-          showToast('WhatsApp e-bill sent!', 'success');
-        } else {
-          const directUrl = getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalance, res?.ebill_text);
-          fbContainer.innerHTML = `
-            <div class="wa-detail-feedback error">
-              <div class="wa-feedback-text">
-                ${renderIcon('messageCircle', { size: 16 })}
-                <span>${escapeHtml(res.message || 'WhatsApp Cloud API not active. Use direct link below.')}</span>
-              </div>
-              ${directUrl ? `
-                <a href="${directUrl}" target="_blank" rel="noreferrer" class="btn-wa-direct-link">
-                  ${renderIcon('externalLink', { size: 13 })} Open Click-to-Chat Link
-                </a>
-              ` : ''}
-            </div>
-          `;
-        }
-      } catch (err) {
-        waBtn.disabled = false;
-        waBtn.innerHTML = `${renderIcon('messageCircle', { size: 16 })} WhatsApp Bill`;
-        const directUrl = getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalance);
-        fbContainer.innerHTML = `
-          <div class="wa-detail-feedback error">
-            <div class="wa-feedback-text">
-              ${renderIcon('alertCircle', { size: 16 })}
-              <span>${escapeHtml(err.message || 'Network error.')}</span>
-            </div>
-            ${directUrl ? `
-              <a href="${directUrl}" target="_blank" rel="noreferrer" class="btn-wa-direct-link">
-                ${renderIcon('externalLink', { size: 13 })} Open Click-to-Chat Link
-              </a>
-            ` : ''}
-          </div>
-        `;
+    waBtn.addEventListener('click', () => {
+      const directUrl = getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalance);
+      if (directUrl) {
+        window.open(directUrl, '_blank');
+        showToast('Opening WhatsApp with e-bill...', 'neutral');
+      } else {
+        showToast('No customer phone number found on this garment.', 'warning');
       }
     });
   }

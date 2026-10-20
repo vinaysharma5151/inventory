@@ -5,7 +5,7 @@ WHY:
 1. Provides the long-lived SSE (Server-Sent Events) endpoint for instant phone-to-laptop sync.
 2. Serves local showroom Wi-Fi IP and camera pairing QR codes for mobile staff.
 3. Manages first-run setup wizard and persistent studio settings.
-4. Delegates QR generation, database backup snapshots, and auto-updates to dedicated services.
+4. Delegates QR generation and database backup snapshots to dedicated services.
 """
 
 from __future__ import annotations
@@ -28,7 +28,6 @@ from backend.services.auth import (
 )
 from backend.services.backup_service import create_database_backup
 from backend.services.qr_service import generate_qr_data_url
-from backend.services.update_service import apply_downloaded_update, check_for_updates
 
 router = APIRouter()
 
@@ -56,12 +55,18 @@ async def sse_stream(request: Request):
                 if await request.is_disconnected():
                     break
                 try:
-                    event_type, data = await asyncio.wait_for(queue.get(), timeout=20.0)
-                    yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    if isinstance(msg, tuple):
+                        event_type, data = msg
+                        yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+                    else:
+                        yield str(msg)
                 except asyncio.TimeoutError:
-                    # Keepalive heartbeat every 20 seconds
+                    # Keepalive heartbeat every 15 seconds
                     yield "event: ping\ndata: {}\n\n"
         except asyncio.CancelledError:
+            pass
+        except Exception as e:
             pass
         finally:
             sse_hub.remove_listener(queue)
@@ -86,7 +91,7 @@ def network_info(port: Optional[int] = None):
     active_port = port or PORT
     ip = get_local_ip()
     network_url = f"http://{ip}:{active_port}"
-    mobile_url = f"http://{ip}:{active_port}/"
+    mobile_url = f"http://{ip}:{active_port}/capture"
 
     qr_data = generate_qr_data_url(mobile_url)
 
@@ -131,18 +136,15 @@ def stats(current_user: dict = Depends(require_staff_or_owner)):
 # ---------------------------------------------------------------------------
 @router.get("/setup-status")
 def setup_status():
-    """Check if first-time studio setup has already been completed."""
+    """Check if first-time studio setup has already been completed (always true)."""
     db = get_db()
     db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-    row = db.execute("SELECT value FROM settings WHERE key = 'first_time_setup_completed'").fetchone()
-    is_completed = bool(row and row["value"] == "true")
-
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
     shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Mehak Bridal Studio"
 
     return {
         "success": True,
-        "is_completed": is_completed,
+        "is_completed": True,
         "shop_name": shop_name,
     }
 
@@ -253,7 +255,7 @@ async def update_settings(
 
 
 # ---------------------------------------------------------------------------
-# Version, Backups & Updates
+# Version & Backups
 # ---------------------------------------------------------------------------
 @router.get("/version")
 def get_app_version():
@@ -263,12 +265,6 @@ def get_app_version():
         "version": APP_VERSION,
         "env": APP_ENV,
     }
-
-
-@router.get("/check-update")
-def check_for_update(current_user: dict = Depends(require_staff_or_owner)):
-    """Check if a newer version of the software is available."""
-    return check_for_updates()
 
 
 @router.post("/backup-now")
@@ -295,33 +291,4 @@ def trigger_manual_backup(
         "success": True,
         "backup_name": backup_name,
         "message": f"Backup snapshot created successfully as '{backup_name}' in the backups/ folder.",
-    }
-
-
-@router.post("/apply-update")
-async def apply_update(
-    payload: dict,
-    request: Request,
-    current_user: dict = Depends(require_owner),
-):
-    """
-    Downloads new .exe, backs up database, and launches update script to restart app.
-    Owner only.
-    """
-    download_url = payload.get("download_url", "")
-    backup_name = apply_downloaded_update(download_url)
-
-    log_audit_event(
-        get_db(),
-        action="APPLY_UPDATE",
-        username=current_user["username"],
-        role="owner",
-        details=f"Backup: {backup_name}, URL: {download_url}",
-        ip_address=get_client_ip(request),
-    )
-
-    return {
-        "success": True,
-        "message": "Update downloaded and verified. The application is restarting with the new version...",
-        "backup_created": backup_name,
     }

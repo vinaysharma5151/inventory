@@ -46,9 +46,7 @@ export function filterArticles(articles, state) {
       const matchTitle = (item.title || '').toLowerCase().includes(q);
       const matchCustomer = (item.customer_name || '').toLowerCase().includes(q);
       const matchPhone = (item.customer_phone || '').toLowerCase().includes(q);
-      const matchSalesman = (item.salesman_name || '').toLowerCase().includes(q);
-      const matchColor = (item.color || '').toLowerCase().includes(q);
-      if (!matchId && !matchTitle && !matchCustomer && !matchPhone && !matchSalesman && !matchColor) {
+      if (!matchId && !matchTitle && !matchCustomer && !matchPhone) {
         return false;
       }
     }
