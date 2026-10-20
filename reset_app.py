@@ -39,18 +39,23 @@ DB_WAL = ROOT_DIR / "lehenga_inventory.sqlite-wal"
 DB_SHM = ROOT_DIR / "lehenga_inventory.sqlite-shm"
 UPLOADS_DIR = ROOT_DIR / "uploads"
 BACKUPS_DIR = ROOT_DIR / "backups"
+LOGS_DIR = ROOT_DIR / "logs"
 
-# Schema definition ensuring clean structure
+# Full production schema definition matching backend/database.py
 _SCHEMA = """
 DROP TABLE IF EXISTS articles;
 DROP TABLE IF EXISTS salesmen;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS login_attempts;
+DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS settings;
 
 CREATE TABLE articles (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id       TEXT    NOT NULL UNIQUE,
     title            TEXT,
-    category         TEXT    DEFAULT 'Bridal Lehenga',
+    category         TEXT    DEFAULT 'Bridal',
     price            REAL    DEFAULT 0,
     security_deposit REAL    DEFAULT 0,
     advance_amount   REAL    DEFAULT 0,
@@ -85,6 +90,52 @@ CREATE TABLE salesmen (
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    role          TEXT    NOT NULL,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_role     ON users(role);
+
+CREATE TABLE sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    username   TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_sessions_token   ON sessions(token);
+CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+
+CREATE TABLE login_attempts (
+    identifier   TEXT PRIMARY KEY,
+    failed_count INTEGER DEFAULT 0,
+    locked_until DATETIME,
+    last_attempt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE audit_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    username   TEXT,
+    role       TEXT,
+    action     TEXT NOT NULL,
+    target_id  TEXT,
+    details    TEXT,
+    ip_address TEXT
+);
+
+CREATE INDEX idx_audit_timestamp ON audit_logs(timestamp);
+CREATE INDEX idx_audit_action    ON audit_logs(action);
+
 CREATE TABLE settings (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -100,8 +151,13 @@ _DEFAULT_STAFF = [
 
 
 def hash_password(plain: str) -> str:
-    """Standard SHA-256 password hash used by the application."""
-    return hashlib.sha256(plain.strip().encode("utf-8")).hexdigest()
+    """Hash password using bcrypt with fallback to sha256."""
+    try:
+        import bcrypt
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(plain.strip().encode("utf-8"), salt).decode("utf-8")
+    except ImportError:
+        return hashlib.sha256(plain.strip().encode("utf-8")).hexdigest()
 
 
 def create_safety_backup() -> str | None:
@@ -135,7 +191,7 @@ def create_safety_backup() -> str | None:
         backup_uploads = dest_dir / "uploads"
         backup_uploads.mkdir(parents=True, exist_ok=True)
         for item in UPLOADS_DIR.iterdir():
-            if item.is_file():
+            if item.is_file() and item.name != ".gitkeep":
                 try:
                     shutil.copy2(item, backup_uploads / item.name)
                     copied_items += 1
@@ -146,11 +202,13 @@ def create_safety_backup() -> str | None:
 
 
 def clean_uploads_directory() -> int:
-    """Delete all files inside uploads/ but keep the directory ready."""
+    """Delete all photos inside uploads/ while preserving .gitkeep."""
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     deleted_count = 0
 
     for item in UPLOADS_DIR.iterdir():
+        if item.name == ".gitkeep":
+            continue
         try:
             if item.is_file() or item.is_symlink():
                 item.unlink()
@@ -161,11 +219,13 @@ def clean_uploads_directory() -> int:
         except Exception as e:
             print(f"  [!] Could not delete {item.name}: {e}")
 
+    # Ensure .gitkeep is present
+    (UPLOADS_DIR / ".gitkeep").touch()
     return deleted_count
 
 
 def clean_temp_files():
-    """Remove SQLite WAL/SHM temporary files and macOS AppleDouble dot-files."""
+    """Remove SQLite WAL/SHM files, app logs, and all recursive macOS AppleDouble dot-files."""
     for temp_file in [DB_WAL, DB_SHM]:
         if temp_file.exists():
             try:
@@ -173,17 +233,32 @@ def clean_temp_files():
             except Exception:
                 pass
 
-    # Clean macOS dot-underscore files if present
-    for dot_file in ROOT_DIR.glob("._*"):
+    # Truncate / clean log file
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    app_log = LOGS_DIR / "app.log"
+    if app_log.exists():
+        try:
+            app_log.unlink()
+        except Exception:
+            pass
+    (LOGS_DIR / ".gitkeep").touch()
+
+    # Recursively clean macOS dot-underscore files and .DS_Store across the entire repository
+    for dot_file in ROOT_DIR.rglob("._*"):
         try:
             dot_file.unlink()
         except Exception:
             pass
 
+    for ds_store in ROOT_DIR.rglob(".DS_Store"):
+        try:
+            ds_store.unlink()
+        except Exception:
+            pass
+
 
 def reset_database(include_default_staff: bool = True):
-    """Rebuild database schema, clear sequences, insert clean staff if requested."""
-    # Ensure parent dir exists
+    """Rebuild database schema, clear sequences, insert clean staff and default settings."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(DB_PATH)
@@ -197,23 +272,36 @@ def reset_database(include_default_staff: bool = True):
         # Execute fresh schema
         cursor.executescript(_SCHEMA)
 
-        # Clear sqlite_sequence if it exists so AUTOINCREMENT restarts at 1
+        # Clear sqlite_sequence so AUTOINCREMENT restarts at 1
         try:
-            cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('articles', 'salesmen');")
+            cursor.execute("DELETE FROM sqlite_sequence;")
         except sqlite3.OperationalError:
             pass
 
-        # Optionally insert default clean staff
+        # Optionally insert default clean staff into both salesmen and users tables
         if include_default_staff:
             for name, pwd in _DEFAULT_STAFF:
+                h = hash_password(pwd)
                 cursor.execute(
                     "INSERT INTO salesmen (name, password_hash) VALUES (?, ?);",
-                    (name, hash_password(pwd)),
+                    (name, h),
                 )
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'staff');",
+                    (name, h),
+                )
+
+        # Insert initial clean settings (leaving first_time_setup_completed absent for fresh onboarding)
+        cursor.execute(
+            "INSERT INTO settings (key, value) VALUES ('shop_name', 'Mehak Bridal Studio');"
+        )
+        cursor.execute(
+            "INSERT INTO settings (key, value) VALUES ('github_repo', 'vinaysharma5151/inventory');"
+        )
 
         conn.commit()
 
-        # Checkpoint WAL and optimize database
+        # Checkpoint WAL and optimize database to minimal size
         cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
         cursor.execute("VACUUM;")
         conn.commit()
@@ -283,7 +371,22 @@ def main():
     staff_names = [r["name"] for r in conn.execute("SELECT name FROM salesmen ORDER BY id").fetchall()]
     conn.close()
 
-    remaining_uploads = len([f for f in UPLOADS_DIR.iterdir() if f.is_file()])
+    # Final temp file cleanup and ship mode check
+    if "--ship" in sys.argv:
+        for b_item in BACKUPS_DIR.iterdir():
+            if b_item.name != ".gitkeep":
+                try:
+                    if b_item.is_dir():
+                        shutil.rmtree(b_item)
+                    else:
+                        b_item.unlink()
+                except Exception:
+                    pass
+        (BACKUPS_DIR / ".gitkeep").touch()
+
+    clean_temp_files()
+
+    remaining_uploads = len([f for f in UPLOADS_DIR.iterdir() if f.is_file() and f.name != ".gitkeep"])
 
     print("\n" + "=" * 64)
     print("             RESET COMPLETED SUCCESSFULLY! ✓")

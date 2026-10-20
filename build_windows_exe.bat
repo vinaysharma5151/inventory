@@ -39,13 +39,15 @@ echo [3/3] Compiling LehengaBooking.exe with PyInstaller...
 %PY_CMD% -m PyInstaller --noconfirm LehengaBooking.spec
 
 if exist "dist\LehengaBooking.exe" (
+    copy /y "dist\LehengaBooking.exe" "LehengaBooking.exe" >nul
     echo.
     echo ===================================================
     echo   SUCCESS! Standalone Executable Created:
+    echo   %CD%\LehengaBooking.exe
     echo   %CD%\dist\LehengaBooking.exe
     echo ===================================================
     echo.
-    echo You can copy LehengaBooking.exe to any Windows PC!
+    echo You can run LehengaBooking.exe directly or copy it to any Windows PC!
     echo When you double-click it, it will launch the app and open the browser.
     echo.
     explorer.exe dist
