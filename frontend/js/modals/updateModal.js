@@ -124,7 +124,7 @@ export async function openUpdateModal(initialUpdateInfo = null) {
       container.innerHTML = `
         <div style="text-align: center; padding: 12px 0;">
           <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 6px;">
-            Current Version: <strong>v${escapeHtml(info.current_version || '1.0.0')}</strong>
+            Current Version: <strong>v${escapeHtml(info.current_version || '2.1.0')}</strong>
           </div>
           <div style="font-size: 0.82rem; color: var(--text-muted); background: var(--bg-hover, rgba(0,0,0,0.03)); padding: 10px; border-radius: 6px; line-height: 1.4;">
             ${renderIcon('wifi-off', { size: 16, style: 'vertical-align: middle; margin-right: 6px;' })}
@@ -217,7 +217,7 @@ export async function openUpdateModal(initialUpdateInfo = null) {
             You Are Up To Date
           </div>
           <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
-            Installed Version: <strong>v${escapeHtml(info.current_version || '1.0.0')}</strong>
+            Installed Version: <strong>v${escapeHtml(info.current_version || '2.1.0')}</strong>
           </div>
           <div style="font-size: 0.78rem; color: var(--text-muted); background: var(--bg-hover, rgba(0,0,0,0.03)); padding: 8px 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; max-width: 90%;">
             ${renderIcon('github', { size: 15 })}

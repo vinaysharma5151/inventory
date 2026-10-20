@@ -105,6 +105,7 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Displays server startup, active port, and mobile pairing IP address
+    icon=os.path.join('frontend', 'favicon.ico'),
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,

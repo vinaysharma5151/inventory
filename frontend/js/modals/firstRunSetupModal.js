@@ -37,8 +37,8 @@ export function renderFirstRunGatekeeper(container, { currentName = 'Mehak Brida
         
         <!-- Header Banner -->
         <div style="background: linear-gradient(135deg, #4A0E17 0%, #2D050B 100%); padding: 28px 24px 24px; text-align: center; color: #FFFFFF; position: relative;">
-          <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(212, 160, 23, 0.18); border: 1.5px solid var(--gold); color: var(--gold); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 0 20px rgba(212, 160, 23, 0.3);">
-            ${renderIcon('crown', { size: 28 })}
+          <div style="width: 68px; height: 68px; border-radius: 14px; background: #FFFFFF; border: 1.5px solid var(--gold); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35); overflow: hidden; padding: 4px;">
+            <img src="/assets/logo.png" alt="Mehak Bridal Studio" style="width: 100%; height: 100%; object-fit: contain;" />
           </div>
           <h1 style="font-family: var(--font-serif); font-size: 22px; font-weight: 700; margin: 0 0 6px 0; letter-spacing: 0.01em; color: #FFFFFF;">
             Welcome to Your Bridal Suite

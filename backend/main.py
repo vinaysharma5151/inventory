@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Mehak Bridal Studio — Lehenga Booking API",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
     docs_url=None,   # Hardened: disable OpenAPI docs in production
     redoc_url=None,  # Hardened: disable ReDoc in production
@@ -159,6 +159,9 @@ app.include_router(whatsapp.router, prefix="/api")
 # Frontend SPA Fallback (No Node.js or Vite required at runtime)
 # ---------------------------------------------------------------------------
 if FRONTEND_DIR.exists():
+    assets_dir = FRONTEND_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
     app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
     app.mount("/js",  StaticFiles(directory=str(FRONTEND_DIR / "js")),  name="js")
 

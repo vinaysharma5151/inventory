@@ -72,8 +72,8 @@ export function createMobileBookingView(containerEl, state) {
         <!-- Top Sticky Mobile Bar -->
         <header class="mobile-top-bar">
           <div class="mobile-brand-group">
-            <div class="mobile-brand-icon">
-              ${renderIcon('crown', { size: 18, color: '#9E7B3B' })}
+            <div class="mobile-brand-icon" title="${escapeHtml(shopName)}">
+              <img src="/assets/logo.png" alt="${escapeHtml(shopName)}" class="mobile-brand-logo-img" />
             </div>
             <div>
               <span class="mobile-brand-name font-serif">${escapeHtml(shopName)}</span>

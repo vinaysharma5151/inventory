@@ -36,8 +36,8 @@ export function renderHeaderHTML(shopName, currentUser) {
     <header class="dashboard-header">
       <div class="header-inner">
         <div class="brand-badge-group">
-          <div class="brand-logo-icon">
-            ${renderIcon('crown', { size: 22, color: 'var(--gold-dark)' })}
+          <div class="brand-logo-icon" title="${escapeHtml(shopName)}">
+            <img src="/assets/logo.png" alt="${escapeHtml(shopName)}" class="brand-logo-img" />
           </div>
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">

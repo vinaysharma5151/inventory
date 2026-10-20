@@ -99,14 +99,24 @@
 }
 
 .mobile-brand-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  background: var(--gold-bg);
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: #FFFFFF;
   border: 1px solid var(--gold-border);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(158, 123, 59, 0.12);
+  flex-shrink: 0;
+}
+
+.mobile-brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 1px;
 }
 
 .mobile-brand-name {

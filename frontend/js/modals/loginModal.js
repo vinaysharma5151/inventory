@@ -19,8 +19,8 @@ export function openLoginModal(onSuccess, defaultRole = 'owner') {
 
   content.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px;">
-      <div style="width: 50px; height: 50px; border-radius: 50%; background: var(--color-burgundy-light); color: var(--color-burgundy); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-        ${renderIcon('lock', { size: 20, className: 'icon-md' })}
+      <div style="width: 64px; height: 64px; border-radius: 12px; background: #FFFFFF; border: 1px solid var(--gold-border); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(158, 123, 59, 0.12); padding: 4px; overflow: hidden;">
+        <img src="/assets/logo.png" alt="Mehak Bridal Studio" style="width: 100%; height: 100%; object-fit: contain;" />
       </div>
       <h2 style="font-family: var(--font-serif); font-size: 20px; color: var(--color-text); margin: 0 0 4px 0;">Sign In</h2>
       <p style="font-size: 13px; color: var(--color-text-muted); margin: 0;">Access showroom inventory and booking system</p>
