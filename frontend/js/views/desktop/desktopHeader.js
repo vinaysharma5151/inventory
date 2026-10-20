@@ -6,7 +6,7 @@
  * and top-level action buttons (QR pairing, staff accounts, WhatsApp, updates, garment creation).
  */
 
-import { api } from '../../api.js';
+import { api } from '../../api.js?v=6';
 import { renderIcon } from '../../icons.js';
 import { showToast } from '../../toast.js';
 import { openAddArticleModal } from '../../modals/addArticleModal.js';
@@ -14,7 +14,6 @@ import { openSalesStaffModal } from '../../modals/salesStaffModal.js';
 import { openQrPairingModal } from '../../modals/qrPairingModal.js';
 import { openShopNameModal } from '../../modals/shopNameModal.js';
 import { openWhatsAppSettingsModal } from '../../modals/whatsappSettingsModal.js';
-import { openLoginModal } from '../../modals/loginModal.js';
 import { openUpdateModal } from '../../modals/updateModal.js';
 
 function escapeHtml(str) {
@@ -61,19 +60,15 @@ export function renderHeaderHTML(shopName, currentUser) {
             <span>Studio Live Sync</span>
           </div>
 
-          ${currentUser ? `
+          ${currentUser && currentUser.role === 'staff' ? `
             <div class="user-badge" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: var(--color-surface); border: 1px solid var(--color-border); font-size: 13px; font-weight: 600;">
-              <span>${currentUser.role === 'owner' ? '👑' : '👤'} ${escapeHtml(currentUser.username)}</span>
+              <span>👤 ${escapeHtml(currentUser.username)}</span>
               <span style="font-size: 10px; text-transform: uppercase; color: var(--color-burgundy); background: var(--color-burgundy-light); padding: 2px 6px; border-radius: 10px; font-weight: 700;">${currentUser.role}</span>
             </div>
             <button type="button" id="btn-logout" class="btn btn-outline btn-sm" title="Sign Out">
               ${renderIcon('logOut', { size: 14 })} Sign Out
             </button>
-          ` : `
-            <button type="button" id="btn-login" class="btn btn-primary btn-sm">
-              ${renderIcon('lock', { size: 14 })} Sign In
-            </button>
-          `}
+          ` : ''}
 
           <button type="button" id="btn-qr-modal" class="btn btn-outline btn-sm">
             ${renderIcon('qrcode', { size: 15 })} Phone Camera QR
@@ -121,7 +116,6 @@ export function bindHeaderEvents(containerEl, callbacks) {
   const btnWa = containerEl.querySelector('#btn-wa-modal');
   const btnCsv = containerEl.querySelector('#btn-export-csv');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
-  const btnLogin = containerEl.querySelector('#btn-login');
   const btnLogout = containerEl.querySelector('#btn-logout');
   const btnUpdate = containerEl.querySelector('#btn-update-modal');
 
@@ -148,13 +142,6 @@ export function bindHeaderEvents(containerEl, callbacks) {
     });
   }
 
-  if (btnLogin) {
-    btnLogin.addEventListener('click', () => {
-      openLoginModal((user) => {
-        if (onUserChange) onUserChange(user);
-      });
-    });
-  }
 
   if (btnLogout) {
     btnLogout.addEventListener('click', async () => {

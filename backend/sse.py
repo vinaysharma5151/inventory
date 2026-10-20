@@ -26,6 +26,11 @@ def remove_client(q: asyncio.Queue) -> None:
     _clients.discard(q)
 
 
+# Aliases for routes/system.py
+add_listener = add_client
+remove_listener = remove_client
+
+
 async def broadcast(event: str, data: Any) -> None:
     """Send an SSE event to every connected client."""
     payload = f"event: {event}\ndata: {json.dumps(data)}\n\n"

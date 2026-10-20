@@ -9,9 +9,9 @@
  * 5. Establishes the real-time Server-Sent Events (SSE) connection for zero-latency live sync.
  */
 
-import { api } from './api.js';
+import { api } from './api.js?v=6';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=8';
 import { createMobileBookingView } from './views/mobileBookingView.js';
 import { renderFirstRunGatekeeper } from './modals/firstRunSetupModal.js';
 import { openLoginModal } from './modals/loginModal.js';

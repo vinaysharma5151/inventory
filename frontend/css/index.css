@@ -3,9 +3,9 @@
    Modular CSS Entry Point
    ============================================================ */
 
-@import "./base.css";
-@import "./components.css";
-@import "./desktop.css";
-@import "./mobile.css";
-@import "./modals.css";
-@import "./print.css";
+@import "./base.css?v=8";
+@import "./components.css?v=8";
+@import "./desktop.css?v=9";
+@import "./mobile.css?v=8";
+@import "./modals.css?v=8";
+@import "./print.css?v=8";

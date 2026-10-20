@@ -81,6 +81,26 @@ export const articlesApi = {
   },
 
   /**
+   * Replaces an existing article's photo.
+   * @param {number|string} id - Article database ID
+   * @param {Blob|File} photoBlob - Raw photo file or compressed image blob
+   * @returns {Promise<{success: boolean, article: object, message?: string}>}
+   */
+  async uploadArticlePhoto(id, photoBlob) {
+    const formData = new FormData();
+    formData.append('photo', photoBlob, 'photo.jpg');
+    const res = await request(`${API_BASE}/articles/${id}/photo`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || data.message || 'Failed to update photo');
+    }
+    return data;
+  },
+
+  /**
    * Clears all remaining balance dues for an article (restricted to Owner).
    * @param {number|string} id - Article database ID
    * @param {string} [notes] - Optional note regarding payment

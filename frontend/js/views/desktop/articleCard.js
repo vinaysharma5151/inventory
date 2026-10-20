@@ -6,12 +6,13 @@
  * thermal tag printing, WhatsApp e-bill sending, dues clearout) for a single article.
  */
 
-import { api } from '../../api.js';
+import { api } from '../../api.js?v=6';
 import { renderIcon } from '../../icons.js';
 import { printGarmentTag } from '../../tag.js';
 import { showToast } from '../../toast.js';
-import { openArticleDetailModal } from '../../modals/articleDetailModal.js';
-import { openClearoutModal } from '../../modals/clearoutModal.js';
+import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=8';
+import { openClearoutModal } from '../../modals/clearoutModal.js?v=8';
+import { openEditArticleModal } from '../../modals/editArticleModal.js?v=8';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -124,15 +125,18 @@ export function createArticleCard(item, context) {
       `}
 
       <div class="card-actions-row">
-        <button type="button" class="btn btn-outline btn-sm card-action-btn btn-details-action">
-          Details
+        <button type="button" class="btn btn-outline btn-sm card-action-btn btn-details-action" title="View Details">
+          ${renderIcon('eye', { size: 13 })} Details
+        </button>
+        <button type="button" class="btn btn-outline btn-sm card-action-btn btn-edit-action" title="Edit Article Data / Fix Errors">
+          ${renderIcon('edit', { size: 13 })} Edit
         </button>
         <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Garment Tag">
-          ${renderIcon('printer', { size: 14 })} Tag
+          ${renderIcon('printer', { size: 13 })} Tag
         </button>
         ${item.customer_phone ? `
-          <button type="button" class="btn btn-outline btn-sm card-action-btn btn-wa-card-action" title="Send WhatsApp E-Bill" style="color: #25D366; border-color: rgba(37, 211, 102, 0.4);">
-            ${renderIcon('messageCircle', { size: 14, color: '#25D366' })} Bill
+          <button type="button" class="btn btn-outline btn-sm card-action-btn btn-wa-card-action" title="Send WhatsApp E-Bill">
+            ${renderIcon('messageCircle', { size: 13 })} Bill
           </button>
         ` : ''}
       </div>
@@ -144,6 +148,7 @@ export function createArticleCard(item, context) {
   const titleEl = card.querySelector('.card-title');
   const idPill = card.querySelector('.card-id-pill');
   const detailsBtn = card.querySelector('.btn-details-action');
+  const editBtn = card.querySelector('.btn-edit-action');
   const tagBtn = card.querySelector('.btn-tag-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
   const waCardBtn = card.querySelector('.btn-wa-card-action');
@@ -159,6 +164,17 @@ export function createArticleCard(item, context) {
   mediaEl.addEventListener('click', openDetails);
   titleEl.addEventListener('click', openDetails);
   detailsBtn.addEventListener('click', openDetails);
+
+  if (editBtn) {
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditArticleModal(item, {
+        onUpdate: (updated) => {
+          if (onUpdate) onUpdate(updated);
+        }
+      });
+    });
+  }
 
   idPill.addEventListener('click', (e) => {
     e.stopPropagation();

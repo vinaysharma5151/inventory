@@ -13,6 +13,7 @@ import { api } from '../api.js';
 import { printGarmentTag } from '../tag.js';
 import { showToast } from '../toast.js';
 import { openClearoutModal } from './clearoutModal.js';
+import { openEditArticleModal } from './editArticleModal.js?v=8';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -77,7 +78,7 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
   modalEl.className = 'modal-backdrop';
 
   modalEl.innerHTML = `
-    <div class="modal-dialog article-detail-dialog" style="max-width: 820px;">
+    <div class="modal-dialog article-detail-dialog" style="max-width: 900px; width: 94vw;">
       <!-- Header -->
       <div class="modal-header">
         <div class="modal-title">
@@ -220,30 +221,36 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
       <div id="wa-feedback-container"></div>
 
       <!-- Footer -->
-      <div class="modal-footer">
-        ${currentUser?.role !== 'staff' ? `
-          <button type="button" class="btn btn-danger btn-sm btn-delete-article">
-            ${renderIcon('trash', { size: 15 })} Delete Piece
+      <div class="modal-footer detail-modal-footer">
+        <div class="footer-actions-left">
+          ${currentUser?.role !== 'staff' ? `
+            <button type="button" class="btn btn-danger btn-sm btn-delete-article" title="Permanently Delete Piece">
+              ${renderIcon('trash', { size: 14 })} Delete Piece
+            </button>
+          ` : ''}
+          <button type="button" class="btn btn-outline btn-sm btn-edit-detail-article" title="Edit Article Data / Fix Errors">
+            ${renderIcon('edit', { size: 14 })} Edit Details
           </button>
-        ` : ''}
-        <div style="flex: 1;"></div>
+        </div>
 
-        ${numBalance > 0 && currentUser?.role !== 'staff' ? `
-          <button type="button" class="btn btn-clearout-footer btn-clear-dues-footer">
-            ${renderIcon('checkCheck', { size: 15 })} Clearout Dues
+        <div class="footer-actions-right">
+          ${numBalance > 0 && currentUser?.role !== 'staff' ? `
+            <button type="button" class="btn btn-clearout-footer btn-clear-dues-footer" title="Settle all dues">
+              ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
+            </button>
+          ` : ''}
+
+          ${article.customer_phone ? `
+            <button type="button" class="btn btn-whatsapp btn-sm btn-send-wa" title="Send WhatsApp Bill">
+              ${renderIcon('messageCircle', { size: 15 })} WhatsApp Bill
+            </button>
+          ` : ''}
+
+          <button type="button" class="btn btn-outline btn-sm btn-close-modal">Close</button>
+          <button type="button" class="btn btn-gold btn-sm btn-print-tag" title="Print Tag">
+            ${renderIcon('printer', { size: 15 })} Print Garment Tag
           </button>
-        ` : ''}
-
-        ${article.customer_phone ? `
-          <button type="button" class="btn btn-whatsapp btn-send-wa">
-            ${renderIcon('messageCircle', { size: 16 })} WhatsApp Bill
-          </button>
-        ` : ''}
-
-        <button type="button" class="btn btn-outline btn-close-modal">Close</button>
-        <button type="button" class="btn btn-gold btn-print-tag">
-          ${renderIcon('printer', { size: 16 })} Print Garment Tag
-        </button>
+        </div>
       </div>
     </div>
   `;
@@ -253,6 +260,20 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
   const btnCloseModal = modalEl.querySelector('.btn-close-modal');
   closeBtn.addEventListener('click', closeModal);
   btnCloseModal.addEventListener('click', closeModal);
+
+  // Edit article trigger
+  const editDetailBtn = modalEl.querySelector('.btn-edit-detail-article');
+  if (editDetailBtn) {
+    editDetailBtn.addEventListener('click', () => {
+      closeModal();
+      openEditArticleModal(article, {
+        onUpdate: (updatedArticle) => {
+          if (onUpdate) onUpdate(updatedArticle);
+          openArticleDetailModal(updatedArticle, shopName, { onUpdate, onDelete, currentUser });
+        }
+      });
+    });
+  }
 
   // Clear dues trigger
   const clearTriggers = modalEl.querySelectorAll('.btn-clear-dues-trigger, .btn-clear-dues-footer');

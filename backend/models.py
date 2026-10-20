@@ -45,7 +45,9 @@ class ArticleUpdate(BaseModel):
                 return val
             except (ValueError, TypeError):
                 raise ValueError("Amount must be a valid non-negative number")
-        return v
+        if v == "":
+            return 0.0
+        return None
 
     @field_validator("customer_phone", mode="before")
     @classmethod

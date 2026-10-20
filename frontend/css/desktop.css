@@ -66,8 +66,11 @@
 .header-actions-row {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  margin-left: auto;
 }
 
 .live-sync-indicator {
@@ -578,14 +581,45 @@
 }
 
 .card-actions-row {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 8px;
+  align-items: center;
 }
 
 .card-action-btn {
-  flex: 1;
+  height: 32px;
+  padding: 0 4px;
+  font-size: 0.77rem;
+  font-weight: 600;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+  letter-spacing: 0.01em;
+  transition: all var(--transition-fast);
+}
+
+.card-action-btn:active {
+  transform: scale(0.97);
+}
+
+.btn-wa-card-action {
+  color: #059669;
+  border-color: #A7F3D0;
+  background: #FFFFFF;
+}
+
+.btn-wa-card-action:hover:not(:disabled) {
+  background: #ECFDF5;
+  border-color: #059669;
+  color: #047857;
 }
 
 /* Empty State */

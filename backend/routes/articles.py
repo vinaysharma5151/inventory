@@ -232,6 +232,7 @@ async def update_article(
     """
     Update article fields.
     If financial fields (price, advance, deposit) are altered, recalculates balance.
+    Enforces uniqueness for article_id across all pieces.
     """
     existing = _get_or_404(article_id)
 
@@ -249,6 +250,27 @@ async def update_article(
     if not fields:
         return {"success": True, "article": existing}
 
+    db = get_db()
+
+    # If article_id is being changed, ensure it's not empty and not in use by another article
+    if "article_id" in updates:
+        new_aid = str(updates["article_id"]).strip()
+        if not new_aid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Article code cannot be empty.",
+            )
+        collision = db.execute(
+            "SELECT id FROM articles WHERE article_id = ? AND id != ?",
+            (new_aid, article_id),
+        ).fetchone()
+        if collision:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Article code '{new_aid}' is already in use by another piece.",
+            )
+        updates["article_id"] = new_aid
+
     # If price or advance were updated, enforce server-side balance calculation
     new_price = float(updates.get("price", existing.get("price", 0)))
     new_advance = float(updates.get("advance_amount", existing.get("advance_amount", 0)))
@@ -259,7 +281,6 @@ async def update_article(
 
     set_clause = ", ".join(f"{f} = ?" for f in fields)
     params = [updates[f] for f in fields] + [article_id]
-    db = get_db()
     db.execute(
         f"UPDATE articles SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         params,
@@ -281,6 +302,64 @@ async def update_article(
 
     await broadcast("UPDATE_ARTICLE", updated)
     return {"success": True, "article": updated}
+
+
+@router.post("/articles/{article_id}/photo")
+async def update_article_photo(
+    article_id: int,
+    photo: UploadFile = File(...),
+    request: Request = None,
+    current_user: dict = Depends(require_staff_or_owner),
+):
+    """
+    Replace garment photo for an existing article.
+    Validates image, strips metadata, saves medium JPEG, and broadcasts update.
+    """
+    if not photo.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only image files are allowed.",
+        )
+
+    article = _get_or_404(article_id)
+    new_image_path = save_article_image(photo, article.get("article_id") or str(article_id))
+
+    # Remove previous image file if not a seeded sample
+    old_img = article.get("image_path", "")
+    if old_img and "sample_" not in old_img:
+        try:
+            full_path = DATA_DIR / old_img.lstrip("/")
+            if full_path.exists():
+                full_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    db = get_db()
+    db.execute(
+        "UPDATE articles SET image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_image_path, article_id),
+    )
+    db.commit()
+
+    updated = _get_or_404(article_id)
+
+    ip = get_client_ip(request) if request else None
+    log_audit_event(
+        db,
+        action="UPDATE_ARTICLE_PHOTO",
+        username=current_user.get("username"),
+        role=current_user.get("role"),
+        target_id=str(article_id),
+        details=f"Replaced photo for article {article.get('article_id')}",
+        ip_address=ip,
+    )
+
+    await broadcast("UPDATE_ARTICLE", updated)
+    return {
+        "success": True,
+        "article": updated,
+        "message": "Garment photo updated successfully.",
+    }
 
 
 @router.post("/articles/{article_id}/clear-dues")

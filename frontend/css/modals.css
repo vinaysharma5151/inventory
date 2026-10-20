@@ -2,7 +2,8 @@
    ARTICLE DETAIL MODAL
 ════════════════════════════════════════ */
 .article-detail-dialog {
-  max-width: 820px;
+  max-width: 900px;
+  width: 94vw;
 }
 
 .detail-modal-grid {
@@ -219,6 +220,64 @@
   background: #059669;
   border-color: #059669;
   color: #FFFFFF;
+}
+
+.detail-modal-footer {
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: nowrap;
+  background: var(--bg-hover);
+  border-top: 1px solid var(--border-light);
+  box-sizing: border-box;
+}
+
+.footer-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.footer-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.detail-modal-footer .btn {
+  padding: 7px 12px;
+  font-size: 0.81rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+@media (max-width: 820px) {
+  .detail-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .footer-actions-left,
+  .footer-actions-right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .footer-actions-right .btn-print-tag {
+    grid-column: span 2;
+  }
 }
 
 .detail-booking-card {
