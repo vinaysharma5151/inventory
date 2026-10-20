@@ -13,7 +13,7 @@ import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
 import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=9';
 import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=8';
-import { createArticleCard } from './desktop/articleCard.js?v=8';
+import { createArticleCard } from './desktop/articleCard.js?v=9';
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];

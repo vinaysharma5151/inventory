@@ -10,7 +10,7 @@
 import { openModal, closeModal } from '../modal.js';
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
-import { printGarmentTag } from '../tag.js';
+import { printThermalBill, printGarmentTag } from '../tag.js?v=9';
 import { showToast } from '../toast.js';
 import { openClearoutModal } from './clearoutModal.js';
 import { openEditArticleModal } from './editArticleModal.js?v=8';
@@ -247,8 +247,8 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
           ` : ''}
 
           <button type="button" class="btn btn-outline btn-sm btn-close-modal">Close</button>
-          <button type="button" class="btn btn-gold btn-sm btn-print-tag" title="Print Tag">
-            ${renderIcon('printer', { size: 15 })} Print Garment Tag
+          <button type="button" class="btn btn-gold btn-sm btn-print-tag btn-print-bill" title="Send Print Request directly to Thermal Printer">
+            ${renderIcon('printer', { size: 15 })} Print Bill (Thermal)
           </button>
         </div>
       </div>
@@ -287,11 +287,13 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     });
   });
 
-  // Print tag trigger
-  const printBtn = modalEl.querySelector('.btn-print-tag');
-  printBtn.addEventListener('click', () => {
-    printGarmentTag(article, shopName);
-  });
+  // Print bill trigger
+  const printBtn = modalEl.querySelector('.btn-print-bill, .btn-print-tag');
+  if (printBtn) {
+    printBtn.addEventListener('click', () => {
+      printThermalBill(article, shopName);
+    });
+  }
 
   // Delete article trigger
   const deleteBtn = modalEl.querySelector('.btn-delete-article');

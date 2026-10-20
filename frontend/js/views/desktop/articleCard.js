@@ -8,9 +8,9 @@
 
 import { api } from '../../api.js?v=6';
 import { renderIcon } from '../../icons.js';
-import { printGarmentTag } from '../../tag.js';
+import { printThermalBill, printGarmentTag } from '../../tag.js?v=9';
 import { showToast } from '../../toast.js';
-import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=8';
+import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=9';
 import { openClearoutModal } from '../../modals/clearoutModal.js?v=8';
 import { openEditArticleModal } from '../../modals/editArticleModal.js?v=8';
 
@@ -131,12 +131,12 @@ export function createArticleCard(item, context) {
         <button type="button" class="btn btn-outline btn-sm card-action-btn btn-edit-action" title="Edit Article Data / Fix Errors">
           ${renderIcon('edit', { size: 13 })} Edit
         </button>
-        <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Garment Tag">
-          ${renderIcon('printer', { size: 13 })} Tag
+        <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Thermal Bill / Receipt (Direct to Printer)">
+          ${renderIcon('printer', { size: 13 })} Bill
         </button>
         ${item.customer_phone ? `
-          <button type="button" class="btn btn-outline btn-sm card-action-btn btn-wa-card-action" title="Send WhatsApp E-Bill">
-            ${renderIcon('messageCircle', { size: 13 })} Bill
+          <button type="button" class="btn btn-outline btn-sm card-action-btn btn-wa-card-action" title="Send WhatsApp E-Bill to Customer">
+            ${renderIcon('messageCircle', { size: 13 })} WA
           </button>
         ` : ''}
       </div>
