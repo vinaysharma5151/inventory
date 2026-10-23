@@ -112,6 +112,14 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
     )
     security_line = f"🛡 *Security Deposit:* Rs. {security:,.0f}\n" if security > 0 else ""
 
+    st = str(article.get("status") or "booked").lower()
+    if st == "picked_up":
+        stage_str = "🛍️ Picked Up (Taken by Customer)"
+    elif st == "returned":
+        stage_str = "✅ Returned (Back in Shop)"
+    else:
+        stage_str = "📌 Booked (Advance Paid)"
+
     text = (
         f"🧾 *E-BILL & BOOKING CONFIRMATION*\n"
         f"*{store_name.upper()}*\n"
@@ -119,6 +127,7 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
         f"👤 *Customer:* {customer_name}\n"
         f"📱 *Mobile:* {phone}\n"
         f"🗓 *Booking ID:* #{art_id} | *Date:* {created_date}\n"
+        f"🏷 *Stage:* {stage_str}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"👗 *Outfit:* {item_display}\n"
         f"{jewel_line}"
@@ -129,6 +138,10 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
         f"💵 *Advance Paid:* Rs. {advance:,.0f}\n"
         f"{security_line}"
         f"{balance_line}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📋 *TERMS & CONDITIONS:*\n"
+        f"1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n"
+        f"2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🙏 _Thank you for choosing {store_name}!_\n"
         f"📍 _Kindly present this e-receipt or Booking #{art_id} at pickup._"

@@ -80,32 +80,49 @@ export function createMobileBookingView(containerEl, state) {
                   <button type="button" id="btn-shutter" class="main-shutter-btn" title="Take Photo">
                     <div class="shutter-inner-ring"></div>
                   </button>
-                  <button type="button" id="btn-open-gallery" class="floating-tool-btn" title="Select Photo / Native Camera">
-                    ${renderIcon('camera', { size: 20 })}
+                  <button type="button" id="btn-open-gallery" class="floating-tool-btn" title="Choose from Phone Gallery">
+                    ${renderIcon('image', { size: 20 })}
                   </button>
                 </div>
               </div>
 
               <div class="preview-container" id="preview-container" style="display: none;">
                 <img id="preview-img" class="preview-image" alt="Captured Lehenga" />
-                <button type="button" id="btn-retake-photo" class="btn btn-outline btn-sm retake-button">
-                  Retake Photo
-                </button>
+                <div class="preview-actions-bar">
+                  <button type="button" id="btn-retake-photo" class="preview-action-btn" title="Retake with Camera">
+                    ${renderIcon('camera', { size: 16 })}
+                    <span>Retake Photo</span>
+                  </button>
+                  <button type="button" id="btn-preview-gallery" class="preview-action-btn preview-action-btn-gold" title="Choose from Phone Gallery">
+                    ${renderIcon('image', { size: 16 })}
+                    <span>From Gallery</span>
+                  </button>
+                </div>
               </div>
 
               <div class="camera-fallback-screen" id="camera-fallback-screen" style="display: none;">
                 <div class="fallback-inner">
                   <div class="fallback-cam-icon">${renderIcon('camera', { size: 36 })}</div>
                   <h4 class="fallback-headline">Camera Capture</h4>
-                  <p class="fallback-sub">Tap below to snap a lehenga photo using your phone's native camera</p>
-                  <button type="button" id="btn-fallback-trigger" class="btn btn-gold btn-sm fallback-cta">
-                    Open Camera
-                  </button>
+                  <p class="fallback-sub">Snap a lehenga photo or choose from your phone's photo gallery</p>
+                  <div class="fallback-actions-row">
+                    <button type="button" id="btn-fallback-trigger" class="btn btn-gold btn-sm fallback-cta">
+                      ${renderIcon('camera', { size: 16 })}
+                      <span>Open Camera</span>
+                    </button>
+                    <button type="button" id="btn-fallback-gallery" class="btn btn-outline btn-sm fallback-cta fallback-gallery-cta">
+                      ${renderIcon('image', { size: 16 })}
+                      <span>From Gallery</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <canvas id="camera-canvas" style="display: none;"></canvas>
+              <!-- Native Camera Input (forces phone camera app) -->
               <input type="file" id="camera-native-input" accept="image/*" capture="environment" style="display: none;" />
+              <!-- Gallery Photo Picker (allows choosing from phone photos/gallery) -->
+              <input type="file" id="camera-gallery-input" accept="image/*" style="display: none;" />
             </div>
           </div>
 

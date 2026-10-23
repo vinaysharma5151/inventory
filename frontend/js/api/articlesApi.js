@@ -14,6 +14,7 @@ export const articlesApi = {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
     if (params.category && params.category !== 'all') query.set('category', params.category);
+    if (params.stage && params.stage !== 'all') query.set('stage', params.stage);
 
     const res = await request(`${API_BASE}/articles?${query.toString()}`);
     if (!res.ok) {
@@ -123,6 +124,64 @@ export const articlesApi = {
     const data = await res.json();
     if (!res.ok || !data.success) {
       throw new Error(data.detail || 'Failed to clear dues');
+    }
+    return data;
+  },
+
+  /**
+   * Stage 2: Marks an article as picked up by customer (settles balance to 0).
+   * @param {number|string} id - Article database ID
+   * @param {string} [notes] - Optional pickup remarks
+   * @returns {Promise<{success: boolean, message: string, article: object}>}
+   */
+  async pickupArticle(id, notes = '') {
+    const res = await request(`${API_BASE}/articles/${id}/pickup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || 'Failed to mark article as picked up');
+    }
+    return data;
+  },
+
+  /**
+   * Stage 3: Marks an article as returned back to the shop catalog.
+   * @param {number|string} id - Article database ID
+   * @param {string} [notes] - Optional return remarks
+   * @returns {Promise<{success: boolean, message: string, article: object}>}
+   */
+  async returnArticle(id, notes = '') {
+    const res = await request(`${API_BASE}/articles/${id}/return`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || 'Failed to mark article as returned');
+    }
+    return data;
+  },
+
+  /**
+   * Stage 3 – Final return: Marks garment as returned, deletes its photo from
+   * disk, and removes its DB record. Backup files are never touched.
+   * @param {number|string} id - Article database ID
+   * @param {string} [notes] - Optional return remarks
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async returnAndDelete(id, notes = '') {
+    const res = await request(`${API_BASE}/articles/${id}/return-and-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || 'Failed to complete return');
     }
     return data;
   },

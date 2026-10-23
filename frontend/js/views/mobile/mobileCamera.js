@@ -20,6 +20,7 @@ export function initMobileCamera(containerEl, callbacks = {}) {
   const video = containerEl.querySelector('#camera-video');
   const canvas = containerEl.querySelector('#camera-canvas');
   const nativeFileInput = containerEl.querySelector('#camera-native-input');
+  const galleryFileInput = containerEl.querySelector('#camera-gallery-input');
   const videoContainer = containerEl.querySelector('#video-container');
   const previewContainer = containerEl.querySelector('#preview-container');
   const previewImg = containerEl.querySelector('#preview-img');
@@ -29,8 +30,10 @@ export function initMobileCamera(containerEl, callbacks = {}) {
   const shutterBtn = containerEl.querySelector('#btn-shutter');
   const flipBtn = containerEl.querySelector('#btn-flip-camera');
   const galleryBtn = containerEl.querySelector('#btn-open-gallery');
+  const previewGalleryBtn = containerEl.querySelector('#btn-preview-gallery');
   const retakeBtn = containerEl.querySelector('#btn-retake-photo');
   const fallbackTrigger = containerEl.querySelector('#btn-fallback-trigger');
+  const fallbackGalleryBtn = containerEl.querySelector('#btn-fallback-gallery');
 
   let stream = null;
   let facingMode = 'environment';
@@ -106,6 +109,9 @@ export function initMobileCamera(containerEl, callbacks = {}) {
     }
     if (previewContainer) previewContainer.style.display = 'none';
 
+    if (galleryFileInput) galleryFileInput.value = '';
+    if (nativeFileInput) nativeFileInput.value = '';
+
     if (cameraDenied) {
       if (fallbackScreen) fallbackScreen.style.display = 'flex';
     } else {
@@ -175,25 +181,69 @@ export function initMobileCamera(containerEl, callbacks = {}) {
     });
   }
 
-  // Open Native Camera or Gallery
-  if (galleryBtn && nativeFileInput) {
-    galleryBtn.addEventListener('click', () => nativeFileInput.click());
+  // Open Phone Gallery (photo library / files)
+  const openGallery = () => {
+    if (galleryFileInput) {
+      galleryFileInput.click();
+    } else if (nativeFileInput) {
+      nativeFileInput.click();
+    }
+  };
+
+  if (galleryBtn) {
+    galleryBtn.addEventListener('click', openGallery);
   }
+  if (previewGalleryBtn) {
+    previewGalleryBtn.addEventListener('click', openGallery);
+  }
+  if (fallbackGalleryBtn) {
+    fallbackGalleryBtn.addEventListener('click', openGallery);
+  }
+
+  // Open Native Camera
   if (fallbackTrigger && nativeFileInput) {
     fallbackTrigger.addEventListener('click', () => nativeFileInput.click());
   }
   if (fallbackScreen && nativeFileInput) {
-    fallbackScreen.addEventListener('click', () => nativeFileInput.click());
+    fallbackScreen.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      nativeFileInput.click();
+    });
   }
 
+  // Handle Gallery Selection
+  if (galleryFileInput) {
+    galleryFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (navigator.vibrate) navigator.vibrate(40);
+
+      try {
+        const mediumBlob = await compressToMediumResolution(file, 1200, 0.80);
+        if (mediumBlob) setPhoto(mediumBlob);
+      } catch (err) {
+        console.warn('Gallery image processing failed:', err);
+      } finally {
+        galleryFileInput.value = '';
+      }
+    });
+  }
+
+  // Handle Native Camera Capture
   if (nativeFileInput) {
     nativeFileInput.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (navigator.vibrate) navigator.vibrate(40);
 
-      const mediumBlob = await compressToMediumResolution(file, 1200, 0.80);
-      if (mediumBlob) setPhoto(mediumBlob);
+      try {
+        const mediumBlob = await compressToMediumResolution(file, 1200, 0.80);
+        if (mediumBlob) setPhoto(mediumBlob);
+      } catch (err) {
+        console.warn('Camera image processing failed:', err);
+      } finally {
+        nativeFileInput.value = '';
+      }
     });
   }
 

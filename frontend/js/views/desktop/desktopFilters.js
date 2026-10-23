@@ -29,6 +29,7 @@ export function filterArticles(articles, state) {
   const {
     searchQuery,
     selectedCategory,
+    stageFilter,
     paymentFilter,
     dateField,
     datePreset,
@@ -52,7 +53,15 @@ export function filterArticles(articles, state) {
       }
     }
 
-    // 2. Category / Collection Filter
+    // 2. Stage Filter (1: Booked, 2: Picked Up, 3: Returned)
+    if (stageFilter && stageFilter !== 'all') {
+      const itemStage = (item.status || 'booked').toLowerCase();
+      if (itemStage !== stageFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // 3. Category / Collection Filter
     if (selectedCategory && selectedCategory !== 'all') {
       const itemCat = (item.category || '').toLowerCase();
       const selCat = selectedCategory.toLowerCase();
@@ -63,7 +72,7 @@ export function filterArticles(articles, state) {
       }
     }
 
-    // 2b. Matching Jewellery Filter
+    // 3b. Matching Jewellery Filter
     if (state.jewelleryFilter === 'only' && Number(item.has_jewellery || 0) !== 1) {
       return false;
     }

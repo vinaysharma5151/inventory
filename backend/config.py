@@ -30,6 +30,7 @@ DB_PATH = DATA_DIR / "lehenga_inventory.sqlite"
 UPLOADS_DIR = DATA_DIR / "uploads"
 LOGS_DIR = DATA_DIR / "logs"
 BACKUPS_DIR = DATA_DIR / "backups"
+CSV_BACKUP_PATH = BACKUPS_DIR / "inventory_backup.csv"
 
 FRONTEND_DIR = BUNDLE_DIR / "frontend"
 

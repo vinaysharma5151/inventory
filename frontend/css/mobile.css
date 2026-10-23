@@ -471,6 +471,48 @@
   display: block;
 }
 
+.preview-actions-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  z-index: 10;
+}
+
+.preview-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.preview-action-btn:active {
+  transform: scale(0.95);
+}
+
+.preview-action-btn-gold {
+  background: var(--gold-gradient);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(158, 123, 59, 0.35);
+}
+
 .retake-button {
   position: absolute;
   bottom: 14px;
@@ -644,6 +686,28 @@
 
 .fallback-cta {
   margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fallback-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.fallback-gallery-cta {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #FAF7F2 !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.fallback-gallery-cta:active {
+  background: rgba(255, 255, 255, 0.22) !important;
 }
 
 .camera-error-banner {

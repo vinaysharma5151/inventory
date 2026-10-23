@@ -109,8 +109,8 @@ export function openClearoutModal(article, onSuccess) {
 
         <!-- Warning / Confirmation Box -->
         <div class="clearout-prompt-box">
-          <div class="prompt-icon">${renderIcon('alertCircle', { size: 18, color: '#D97706' })}</div>
-          <div>Customer is settling the remaining <strong>₹${formatINR(numBalance)}</strong>. Confirming will set balance to ₹0 and mark the booking as Paid in Full.</div>
+          <div class="prompt-icon">${renderIcon('shoppingBag', { size: 18, color: '#059669' })}</div>
+          <div>Stage 2: Customer is paying the remaining <strong>₹${formatINR(numBalance)}</strong> and taking the garment. Confirming will set balance to ₹0 and advance article to <strong>Stage 2: Picked Up</strong>.</div>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export function openClearoutModal(article, onSuccess) {
         <button type="button" class="btn btn-outline cancel-btn">Cancel</button>
         <button type="button" class="btn btn-clearout-confirm confirm-btn" id="confirm-clearout-btn">
           ${renderIcon('checkCheck', { size: 16, color: '#FFFFFF' })}
-          <span>Confirm Clearance (₹${formatINR(numBalance)})</span>
+          <span>Clear Dues &amp; Confirm Pick Up (₹${formatINR(numBalance)})</span>
         </button>
       </div>
     </div>
@@ -135,19 +135,19 @@ export function openClearoutModal(article, onSuccess) {
 
   confirmBtn.addEventListener('click', async () => {
     confirmBtn.disabled = true;
-    confirmBtn.innerHTML = `${renderIcon('loader', { size: 16, className: 'spinner-icon' })} Clearing dues...`;
+    confirmBtn.innerHTML = `${renderIcon('loader', { size: 16, className: 'spinner-icon' })} Processing pickup...`;
 
     try {
-      const res = await api.clearDues(article.id, 'Counter Settlement');
+      const res = await api.clearDues(article.id, 'Counter Settlement & Pickup');
 
       if (res.success && res.article) {
-        showToast(`All dues cleared for ${article.article_id}! Paid in full.`, 'success');
+        showToast(`Article ${article.article_id} dues cleared & marked as Picked Up!`, 'success');
         closeModal();
         if (onSuccess) onSuccess(res.article);
       } else {
         alert(res.message || 'Failed to clear dues.');
         confirmBtn.disabled = false;
-        confirmBtn.innerHTML = `Confirm Clearance`;
+        confirmBtn.innerHTML = `Clear Dues & Confirm Pick Up`;
       }
     } catch (err) {
       alert('Error clearing dues: ' + err.message);

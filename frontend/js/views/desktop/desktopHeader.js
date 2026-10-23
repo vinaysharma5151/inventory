@@ -64,8 +64,8 @@ export function renderHeaderHTML(shopName, currentUser) {
             ${renderIcon('printer', { size: 15 })} Printer
           </button>
 
-          <button type="button" id="btn-export-csv" class="btn btn-outline btn-sm">
-            ${renderIcon('download', { size: 15 })} Export CSV
+          <button type="button" id="btn-backup" class="btn btn-outline btn-sm" title="Backup all inventory records to CSV file in app folder">
+            ${renderIcon('database', { size: 15 })} Backup
           </button>
 
           <button type="button" id="btn-add-garment" class="btn btn-gold btn-sm">
@@ -88,7 +88,7 @@ export function bindHeaderEvents(containerEl, callbacks) {
   const btnEditShop = containerEl.querySelector('#btn-edit-shop');
   const btnQr = containerEl.querySelector('#btn-qr-modal');
   const btnPrinter = containerEl.querySelector('#btn-printer-setup');
-  const btnCsv = containerEl.querySelector('#btn-export-csv');
+  const btnBackup = containerEl.querySelector('#btn-backup') || containerEl.querySelector('#btn-export-csv');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
   const btnLogout = containerEl.querySelector('#btn-logout');
 
@@ -117,7 +117,6 @@ export function bindHeaderEvents(containerEl, callbacks) {
     });
   }
 
-
   if (btnLogout) {
     btnLogout.addEventListener('click', async () => {
       await api.logout();
@@ -126,9 +125,21 @@ export function bindHeaderEvents(containerEl, callbacks) {
     });
   }
 
-  if (btnCsv) {
-    btnCsv.addEventListener('click', () => {
-      window.location.href = '/api/export/csv';
+  if (btnBackup) {
+    btnBackup.addEventListener('click', async () => {
+      const originalHtml = btnBackup.innerHTML;
+      try {
+        btnBackup.disabled = true;
+        btnBackup.innerHTML = `${renderIcon('loader', { size: 15, className: 'spin' })} Backing up...`;
+
+        const res = await api.backupNow();
+        showToast(res.message || 'Backup saved successfully in backups folder', 'success');
+      } catch (err) {
+        showToast(err.message || 'Failed to update backup', 'error');
+      } finally {
+        btnBackup.disabled = false;
+        btnBackup.innerHTML = originalHtml;
+      }
     });
   }
 }

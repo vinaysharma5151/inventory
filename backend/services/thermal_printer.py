@@ -149,6 +149,16 @@ def build_escpos_bill(article: dict, shop_name: str = "MEHAK BRIDAL STUDIO") -> 
     chunks.append(b"[ GARMENT & BOOKING ]\n")
     chunks.append(b"\x1b\x45\x00")
     chunks.append(esc_box_badge(f"ARTICLE CODE: {art_id}").encode("ascii", errors="replace"))
+
+    st = str(article.get("status") or "booked").lower()
+    if st == "picked_up":
+        stage_title = "STAGE 2: PICKED UP (TAKEN)"
+    elif st == "returned":
+        stage_title = "STAGE 3: RETURNED (IN SHOP)"
+    else:
+        stage_title = "STAGE 1: BOOKED (ADVANCE)"
+    chunks.append(esc_row("Booking Stage:", stage_title).encode("ascii", errors="replace"))
+
     chunks.append(esc_row("Item:", title[:35]).encode("ascii", errors="replace"))
     chunks.append(esc_row("Collection:", str(article.get("category") or "Bridal")).encode("ascii", errors="replace"))
 
@@ -227,10 +237,10 @@ def build_escpos_bill(article: dict, shop_name: str = "MEHAK BRIDAL STUDIO") -> 
     chunks.append(b"\x1b\x61\x00")  # Left
     chunks.append(b"------------------------------------------------\n")
     chunks.append(b"TERMS & CONDITIONS:\n")
-    chunks.append(b"1. Original bill copy is required during Pickup & Return.\n")
-    chunks.append(b"2. Security deposit is refundable upon safe return.\n")
-    chunks.append(b"3. Garments must be returned on or before Return Date.\n")
-    chunks.append(b"4. Verify garment condition before leaving atelier.\n")
+    chunks.append(b"1. No cancellation, refund, or adjustment once\n")
+    chunks.append(b"   booking is confirmed under any condition.\n")
+    chunks.append(b"2. Outfit must be returned on or before the\n")
+    chunks.append(b"   Return Date, else penalty of Rs. 300/day.\n")
 
     # 10. Footer
     chunks.append(b"\x1b\x61\x01")  # Center
@@ -286,6 +296,36 @@ def build_test_receipt(printer_name: str) -> bytes:
 # ---------------------------------------------------------------------------
 # Hardware Discovery & Windows Spooler Execution
 # ---------------------------------------------------------------------------
+def _get_winspool():
+    """
+    Safely loads the Windows print spooler driver (winspool.drv).
+    WHY:
+    In PyInstaller frozen .exe packages, accessing `ctypes.windll.winspool` causes
+    PyInstaller's ctypes loader to search for `winspool.dll`, which does not exist
+    on Windows (the native spooler library is `winspool.drv`).
+    Calling `ctypes.WinDLL("winspool.drv")` explicitly resolves to the native
+    Windows print spooler without throwing PyInstallerImportError.
+    """
+    import ctypes
+    candidates = [
+        "winspool.drv",
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "System32", "winspool.drv"),
+        "winspool",
+    ]
+    for lib in candidates:
+        try:
+            return ctypes.WinDLL(lib)
+        except Exception:
+            continue
+
+    try:
+        return ctypes.windll.LoadLibrary("winspool.drv")
+    except Exception:
+        pass
+
+    raise RuntimeError("Failed to load Windows print spooler library (winspool.drv).")
+
+
 def get_installed_printers() -> List[str]:
     """Returns all printer names installed on the local operating system."""
     printers: List[str] = []
@@ -296,7 +336,7 @@ def get_installed_printers() -> List[str]:
             import ctypes
             from ctypes import wintypes
 
-            winspool = ctypes.windll.winspool
+            winspool = _get_winspool()
             PRINTER_ENUM_LOCAL = 0x00000002
             PRINTER_ENUM_CONNECTIONS = 0x00000004
             flags = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS
@@ -413,50 +453,56 @@ def send_raw_escpos_to_printer(printer_name: str, raw_bytes: bytes) -> Tuple[boo
         return True, f"Simulated print sent to '{printer_name}' ({len(raw_bytes)} bytes)."
 
     # Windows Native winspool.drv implementation
-    import ctypes
-    from ctypes import wintypes
-
-    class DOC_INFO_1(ctypes.Structure):
-        _fields_ = [
-            ("pDocName", wintypes.LPCWSTR),
-            ("pOutputFile", wintypes.LPCWSTR),
-            ("pDataType", wintypes.LPCWSTR),
-        ]
-
-    winspool = ctypes.windll.winspool
-    handle = wintypes.HANDLE()
-
-    if not winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None):
-        return False, f"Could not connect to printer '{printer_name}'. Check USB cable & power."
-
     try:
-        doc_info = DOC_INFO_1()
-        doc_info.pDocName = "Thermal Receipt"
-        doc_info.pOutputFile = None
-        doc_info.pDataType = "RAW"  # Critical: tells Windows spooler to pass bytes unaltered
+        import ctypes
+        from ctypes import wintypes
 
-        job_id = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc_info))
-        if job_id <= 0:
+        class DOC_INFO_1(ctypes.Structure):
+            _fields_ = [
+                ("pDocName", wintypes.LPCWSTR),
+                ("pOutputFile", wintypes.LPCWSTR),
+                ("pDataType", wintypes.LPCWSTR),
+            ]
+
+        winspool = _get_winspool()
+        handle = wintypes.HANDLE()
+
+        if not winspool.OpenPrinterW(printer_name, ctypes.byref(handle), None):
             err = ctypes.GetLastError()
-            return False, f"Printer rejected print job (Windows Error Code: {err})."
+            return False, f"Could not connect to printer '{printer_name}' (Windows Error: {err}). Check USB cable & power."
 
         try:
-            winspool.StartPagePrinter(handle)
-            written = wintypes.DWORD(0)
-            data_buf = ctypes.create_string_buffer(raw_bytes)
-            success = winspool.WritePrinter(handle, data_buf, len(raw_bytes), ctypes.byref(written))
-            winspool.EndPagePrinter(handle)
-            if not success or written.value < len(raw_bytes):
-                return False, f"Partial write to printer: {written.value}/{len(raw_bytes)} bytes sent."
-        finally:
-            winspool.EndDocPrinter(handle)
+            doc_info = DOC_INFO_1()
+            doc_info.pDocName = "Thermal Receipt"
+            doc_info.pOutputFile = None
+            doc_info.pDataType = "RAW"  # Critical: tells Windows spooler to pass bytes unaltered
 
-        return True, f"Printed successfully to {printer_name}."
+            job_id = winspool.StartDocPrinterW(handle, 1, ctypes.byref(doc_info))
+            if job_id <= 0:
+                err = ctypes.GetLastError()
+                return False, f"Printer rejected print job (Windows Error Code: {err})."
+
+            try:
+                if not winspool.StartPagePrinter(handle):
+                    err = ctypes.GetLastError()
+                    return False, f"Failed to start print page (Windows Error Code: {err})."
+
+                written = wintypes.DWORD(0)
+                data_buf = ctypes.create_string_buffer(raw_bytes)
+                success = winspool.WritePrinter(handle, data_buf, len(raw_bytes), ctypes.byref(written))
+                winspool.EndPagePrinter(handle)
+                if not success or written.value < len(raw_bytes):
+                    return False, f"Partial write to printer: {written.value}/{len(raw_bytes)} bytes sent."
+            finally:
+                winspool.EndDocPrinter(handle)
+
+            return True, f"Printed successfully to {printer_name}."
+        finally:
+            if handle:
+                winspool.ClosePrinter(handle)
     except Exception as e:
         logger.exception(f"Windows Spooler write error: {e}")
         return False, f"Spooler error: {e}"
-    finally:
-        winspool.ClosePrinter(handle)
 
 
 def print_article_thermal(article: dict, shop_name: str, target_printer: Optional[str] = None) -> Tuple[bool, str]:

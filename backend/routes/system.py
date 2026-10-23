@@ -26,7 +26,10 @@ from backend.services.auth import (
     require_owner,
     require_staff_or_owner,
 )
-from backend.services.backup_service import create_database_backup
+from backend.services.backup_service import (
+    create_database_backup,
+    update_inventory_csv_backup,
+)
 from backend.services.qr_service import generate_qr_data_url
 from backend.services.thermal_printer import (
     build_test_receipt,
@@ -122,12 +125,23 @@ def network_info(port: Optional[int] = None):
 # ---------------------------------------------------------------------------
 @router.get("/stats")
 def stats(current_user: dict = Depends(require_staff_or_owner)):
-    """Computes showroom inventory counts and financial aggregates."""
+    """Computes showroom inventory counts, stage progression, and financial aggregates."""
     db = get_db()
     total = db.execute("SELECT COUNT(*) FROM articles").fetchone()[0]
     total_val = db.execute("SELECT COALESCE(SUM(price), 0) FROM articles").fetchone()[0]
     total_adv = db.execute("SELECT COALESCE(SUM(advance_amount), 0) FROM articles").fetchone()[0]
     total_bal = db.execute("SELECT COALESCE(SUM(balance_amount), 0) FROM articles").fetchone()[0]
+
+    # 3-Stage Workflow Aggregates
+    booked_count = db.execute(
+        "SELECT COUNT(*) FROM articles WHERE status = 'booked' OR status IS NULL OR TRIM(status) = ''"
+    ).fetchone()[0]
+    picked_up_count = db.execute(
+        "SELECT COUNT(*) FROM articles WHERE status = 'picked_up'"
+    ).fetchone()[0]
+    returned_count = db.execute(
+        "SELECT COUNT(*) FROM articles WHERE status = 'returned'"
+    ).fetchone()[0]
 
     return {
         "success": True,
@@ -135,6 +149,9 @@ def stats(current_user: dict = Depends(require_staff_or_owner)):
         "total_value": total_val,
         "total_advance": total_adv,
         "total_balance_due": total_bal,
+        "booked_count": booked_count,
+        "picked_up_count": picked_up_count,
+        "returned_count": returned_count,
     }
 
 
@@ -275,13 +292,19 @@ def get_app_version():
 
 
 @router.post("/backup-now")
+@router.post("/backup")
 def trigger_manual_backup(
     request: Request,
     current_user: dict = Depends(require_owner),
 ):
-    """Creates an immediate snapshot of the SQLite database in the backups/ folder."""
+    """
+    Creates an immediate CSV backup (inventory_backup.csv) and SQLite database snapshot
+    exclusively inside the backups/ folder (not in the open app root).
+    """
+    csv_result = update_inventory_csv_backup()
     backup_name = create_database_backup()
-    if not backup_name:
+
+    if not backup_name and not csv_result.get("success"):
         raise HTTPException(status_code=500, detail="Database file not found or could not be backed up.")
 
     ip = get_client_ip(request)
@@ -290,14 +313,16 @@ def trigger_manual_backup(
         action="MANUAL_BACKUP",
         username=current_user["username"],
         role="owner",
-        details=f"Manual snapshot created: {backup_name}",
+        details=f"Backup created: {csv_result.get('filename')} ({csv_result.get('count', 0)} items), Snapshot: {backup_name}",
         ip_address=ip,
     )
 
     return {
         "success": True,
         "backup_name": backup_name,
-        "message": f"Backup snapshot created successfully as '{backup_name}' in the backups/ folder.",
+        "csv_backup": csv_result.get("filename"),
+        "count": csv_result.get("count", 0),
+        "message": csv_result.get("message") or f"Backup updated successfully as '{csv_result.get('filename')}'.",
     }
 
 
@@ -345,14 +370,20 @@ def test_thermal_printer(payload: dict = None):
     if not target:
         raise HTTPException(status_code=400, detail="No thermal printer detected. Please connect your PIXEL DP82 via USB.")
 
-    raw_ticket = build_test_receipt(target)
-    ok, msg = send_raw_escpos_to_printer(target, raw_ticket)
-    if not ok:
-        raise HTTPException(status_code=500, detail=msg)
+    try:
+        raw_ticket = build_test_receipt(target)
+        ok, msg = send_raw_escpos_to_printer(target, raw_ticket)
+        if not ok:
+            raise HTTPException(status_code=500, detail=msg)
 
-    return {
-        "success": True,
-        "printer": target,
-        "message": msg,
-    }
+        return {
+            "success": True,
+            "printer": target,
+            "message": msg,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Thermal printer test error: {e}")
+        raise HTTPException(status_code=500, detail=f"Thermal test failed: {e}")
 

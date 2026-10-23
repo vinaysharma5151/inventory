@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS articles (
     booking_date     TEXT,
     return_date      TEXT,
     salesman_name    TEXT,
+    status           TEXT    DEFAULT 'booked',
     has_jewellery    INTEGER DEFAULT 0,
     jewellery_details TEXT,
     jewellery_price  REAL    DEFAULT 0,
@@ -168,6 +169,7 @@ _MIGRATE_COLUMNS = {
     "salesman_name":     "TEXT",
     "advance_amount":    "REAL DEFAULT 0",
     "balance_amount":    "REAL DEFAULT 0",
+    "status":            "TEXT DEFAULT 'booked'",
     "has_jewellery":     "INTEGER DEFAULT 0",
     "jewellery_details": "TEXT",
     "jewellery_price":   "REAL DEFAULT 0",
@@ -191,6 +193,10 @@ def init_db() -> None:
         if col not in existing_cols:
             db.execute(f"ALTER TABLE articles ADD COLUMN {col} {col_type}")
             print(f"[DB MIGRATE] Added column: {col}")
+
+    # Ensure all rows have a valid stage/status
+    db.execute("UPDATE articles SET status = 'booked' WHERE status IS NULL OR TRIM(status) = ''")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status)")
 
     # Migrate: drop obsolete color and size columns if present
     if "color" in existing_cols:

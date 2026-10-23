@@ -703,4 +703,265 @@
   flex-shrink: 0;
 }
 
+/* ════════════════════════════════════════
+   3-STAGE SHOWROOM WORKFLOW & DETAIL BUTTONS
+════════════════════════════════════════ */
+.detail-stage-tracker-card {
+  background: #FCFBF8;
+  border: 1px solid #EBE4D5;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.stage-tracker-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stage-tracker-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stage-tracker-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.stage-tracker-subtitle {
+  font-size: 0.72rem;
+  color: #78716C;
+}
+
+/* Stepper Row */
+.stage-stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  gap: 8px;
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.55;
+  transition: all var(--transition-fast);
+}
+
+.stepper-step.active,
+.stepper-step.completed {
+  opacity: 1;
+}
+
+.stepper-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #E5E7EB;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.stepper-step.active .stepper-circle {
+  background: var(--gold);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+}
+
+.stepper-step.completed .stepper-circle {
+  background: #059669;
+  color: #FFFFFF;
+}
+
+.stepper-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stepper-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.stepper-sub {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.stepper-connector {
+  flex: 1;
+  height: 2px;
+  background: #E5E7EB;
+  margin: 0 6px;
+  transition: background var(--transition-fast);
+}
+
+.stepper-connector.completed {
+  background: #059669;
+}
+
+/* Buttons Grid in Detail Section */
+.stage-actions-button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-stage-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  background: #FFFFFF;
+  min-height: 52px;
+}
+
+.btn-stage-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-stage-action:active {
+  transform: translateY(0);
+}
+
+.btn-stage-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.btn-stage-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.btn-stage-desc {
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pickup Button */
+.btn-stage-pickup-action {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+
+.btn-stage-pickup-action:hover {
+  background: #D1FAE5;
+  border-color: #059669;
+  color: #047857;
+}
+
+.btn-stage-pickup-action.is-current-stage {
+  background: #059669;
+  border-color: #047857;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.35);
+}
+
+/* Return Button */
+.btn-stage-return-action {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #1E40AF;
+}
+
+.btn-stage-return-action:hover {
+  background: #DBEAFE;
+  border-color: #2563EB;
+  color: #1D4ED8;
+}
+
+.btn-stage-return-action.is-current-stage {
+  background: #2563EB;
+  border-color: #1D4ED8;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* Stage Badges */
+.badge-stage-booked {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+  font-weight: 600;
+}
+
+.badge-stage-picked {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  font-weight: 600;
+}
+
+.badge-stage-returned {
+  background: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
+  font-weight: 600;
+}
+
+/* Footer Return Button */
+.btn-return-footer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-return-footer:hover {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+}
+
 

@@ -395,6 +395,9 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
         <div class="article-id-badge font-mono">
           ARTICLE CODE: ${escapeHtml(article.article_id || '0001')}
         </div>
+        <div class="receipt-status-line">
+          STAGE: ${(article.status || 'booked').toUpperCase() === 'RETURNED' ? 'STAGE 3: RETURNED (BACK IN SHOP)' : ((article.status || 'booked').toUpperCase() === 'PICKED_UP' ? 'STAGE 2: PICKED UP (TAKEN BY CUSTOMER)' : 'STAGE 1: BOOKED (ADVANCE PAID)')}
+        </div>
         <div class="receipt-row">
           <span class="receipt-label">ITEM:</span>
           <span class="receipt-val bold">${escapeHtml(displayTitle)}</span>
@@ -493,10 +496,8 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
       <div class="receipt-terms">
         <div class="receipt-section-title">TERMS &amp; CONDITIONS:</div>
         <ol class="receipt-terms-list">
-          <li>Original bill copy is required during garment Pickup &amp; Return.</li>
-          <li>Security deposit is refundable upon safe return of garment in original condition.</li>
-          <li>Garments must be returned on or before the agreed Return Date.</li>
-          <li>Kindly verify garment condition and accessories before leaving the atelier.</li>
+          <li>No cancellation, refund, or adjustment once booking is confirmed under any condition.</li>
+          <li>Outfit must be returned on or before the Return Date, failing which a penalty of Rs. 300 per day will apply.</li>
         </ol>
       </div>
 

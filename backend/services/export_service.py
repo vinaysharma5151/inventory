@@ -41,7 +41,7 @@ def generate_inventory_csv_response() -> StreamingResponse:
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_ALL)
     writer.writerow([
-        "ID", "Article ID", "Title / Description", "Category",
+        "ID", "Article ID", "Title / Description", "Category", "Booking Stage",
         "Customer Name", "Customer Phone", "Customer Address", "Pickup Date", "Return Date", "Booking Date",
         "Rental Price (₹)", "Advance (₹)", "Balance (₹)",
         "Matching Jewellery", "Jewellery Price (₹)",
@@ -57,6 +57,14 @@ def generate_inventory_csv_response() -> StreamingResponse:
         else:
             clean_t = raw_t
 
+        st = (a.get("status") or "booked").lower()
+        if st == "picked_up":
+            stage_display = "Stage 2: Picked Up (Taken by Customer)"
+        elif st == "returned":
+            stage_display = "Stage 3: Returned (Back in Shop)"
+        else:
+            stage_display = "Stage 1: Booked (Advance Paid)"
+
         has_j = int(a.get("has_jewellery") or 0) == 1
         j_details = str(a.get("jewellery_details") or "Yes") if has_j else "No"
         j_price = a.get("jewellery_price") if has_j else 0
@@ -66,6 +74,7 @@ def generate_inventory_csv_response() -> StreamingResponse:
             sanitize_csv_cell(a["article_id"]),
             sanitize_csv_cell(clean_t),
             sanitize_csv_cell(cat_n),
+            sanitize_csv_cell(stage_display),
             sanitize_csv_cell(a.get("customer_name") or "N/A"),
             sanitize_csv_cell(a.get("customer_phone") or "N/A"),
             sanitize_csv_cell(a.get("customer_address") or "N/A"),

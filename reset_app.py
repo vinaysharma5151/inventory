@@ -8,13 +8,12 @@ Enables the showroom owner, staff, or developer to wipe all previous data
 resetting the application back to a 100% pristine, fresh day-one state.
 
 WHAT THIS SCRIPT DOES:
-  1. Automatic Safety Backup: Archives current database & uploads into backups/
-  2. Database Reset: Wipes all articles, customer data, and booking records.
+  1. Database Reset: Wipes all articles, customer data, and booking records.
      Resets SQLite auto-increment sequences so article numbering starts fresh from 0001.
-  3. Uploads Purge: Deletes all uploaded garment photos from uploads/ directory.
-  4. Cache & WAL Flush: Removes SQLite temporary lock/journal files and AppleDouble dot-files.
-  5. Clean Slate Setup: Resets shop settings and initial configurations.
-  6. SQLite Optimization: Runs PRAGMA wal_checkpoint and VACUUM to minimize file size.
+  2. Uploads Purge: Deletes all uploaded garment photos from uploads/ directory.
+  3. Cache & WAL Flush: Removes SQLite temporary lock/journal files and AppleDouble dot-files.
+  4. Clean Slate Setup: Resets shop settings and initial configurations.
+  5. SQLite Optimization: Runs PRAGMA wal_checkpoint and VACUUM to minimize file size.
 
 USAGE:
   python3 reset_app.py           # Interactive mode (asks for confirmation)
@@ -69,11 +68,16 @@ CREATE TABLE articles (
     booking_date     TEXT,
     return_date      TEXT,
     salesman_name    TEXT,
+    status           TEXT    DEFAULT 'booked',
+    has_jewellery    INTEGER DEFAULT 0,
+    jewellery_details TEXT,
+    jewellery_price  REAL    DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_articles_article_id  ON articles(article_id);
+CREATE INDEX idx_articles_status      ON articles(status);
 CREATE INDEX idx_articles_category    ON articles(category);
 CREATE INDEX idx_articles_created     ON articles(created_at);
 CREATE INDEX idx_articles_pickup_date ON articles(pickup_date);
@@ -144,47 +148,6 @@ def hash_password(plain: str) -> str:
         return hashlib.sha256(plain.strip().encode("utf-8")).hexdigest()
 
 
-def create_safety_backup() -> str | None:
-    """Create a timestamped backup before wiping data to prevent accidental loss."""
-    if not DB_PATH.exists() and not UPLOADS_DIR.exists():
-        return None
-
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    dest_dir = BACKUPS_DIR / f"backup_{timestamp}"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    copied_items = 0
-
-    # Backup database
-    if DB_PATH.exists():
-        shutil.copy2(DB_PATH, dest_dir / DB_PATH.name)
-        copied_items += 1
-    if DB_WAL.exists():
-        try:
-            shutil.copy2(DB_WAL, dest_dir / DB_WAL.name)
-        except Exception:
-            pass
-    if DB_SHM.exists():
-        try:
-            shutil.copy2(DB_SHM, dest_dir / DB_SHM.name)
-        except Exception:
-            pass
-
-    # Backup uploads
-    if UPLOADS_DIR.exists():
-        backup_uploads = dest_dir / "uploads"
-        backup_uploads.mkdir(parents=True, exist_ok=True)
-        for item in UPLOADS_DIR.iterdir():
-            if item.is_file() and item.name != ".gitkeep":
-                try:
-                    shutil.copy2(item, backup_uploads / item.name)
-                    copied_items += 1
-                except Exception:
-                    pass
-
-    return str(dest_dir) if copied_items > 0 else None
-
-
 def clean_uploads_directory() -> int:
     """Delete all photos inside uploads/ while preserving .gitkeep."""
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -216,6 +179,14 @@ def clean_temp_files():
                 temp_file.unlink()
             except Exception:
                 pass
+
+    # Remove any open CSV backup in root
+    open_csv = ROOT_DIR / "inventory_backup.csv"
+    if open_csv.exists():
+        try:
+            open_csv.unlink()
+        except Exception:
+            pass
 
     # Truncate / clean log file
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -317,26 +288,19 @@ def main():
             print("\n\n[CANCELLED] Operation aborted.")
             return
 
-    print("\n[1/5] Creating automatic safety backup...")
-    backup_path = create_safety_backup()
-    if backup_path:
-        print(f"      Safety backup saved to:\n      -> {backup_path}")
-    else:
-        print("      No existing data needed backup.")
-
-    print("\n[2/5] Cleaning uploaded photos...")
+    print("\n[1/4] Cleaning uploaded photos...")
     deleted_images = clean_uploads_directory()
     print(f"      Removed {deleted_images} uploaded file(s). Uploads directory is fresh and empty.")
 
-    print("\n[3/5] Cleaning lock and temporary cache files...")
+    print("\n[2/4] Cleaning lock and temporary cache files...")
     clean_temp_files()
     print("      Temporary WAL and metadata files cleared.")
 
-    print("\n[4/5] Resetting database schema and auto-increment sequences...")
+    print("\n[3/4] Resetting database schema and auto-increment sequences...")
     reset_database()
     print("      Database recreated with clean schema.")
 
-    print("\n[5/5] Verifying fresh system state...")
+    print("\n[4/4] Verifying fresh system state...")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     articles_count = conn.execute("SELECT COUNT(*) FROM articles").fetchone()[0]

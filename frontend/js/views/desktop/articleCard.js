@@ -8,11 +8,11 @@
 
 import { api } from '../../api.js?v=7';
 import { renderIcon } from '../../icons.js';
-import { printThermalBill, printGarmentTag } from '../../tag.js?v=10';
+import { printThermalBill, printGarmentTag } from '../../tag.js?v=11';
 import { showToast } from '../../toast.js';
-import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=10';
-import { openClearoutModal } from '../../modals/clearoutModal.js?v=8';
-import { openEditArticleModal } from '../../modals/editArticleModal.js?v=9';
+import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=12';
+import { openClearoutModal } from '../../modals/clearoutModal.js?v=9';
+import { openEditArticleModal } from '../../modals/editArticleModal.js?v=10';
 import { openWhatsAppBillModal } from '../../modals/whatsappModal.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
@@ -56,11 +56,21 @@ export function createArticleCard(item, context) {
     item.title.toLowerCase() !== customerName.toLowerCase()
   );
 
-  const isPaid = numPrice > 0 && numBalance === 0;
+  const stage = (item.status || 'booked').toLowerCase();
+  let stageBadgeHtml = '';
+  if (stage === 'returned') {
+    stageBadgeHtml = `<span class="badge badge-stage-returned" title="Stage 3: Customer returned article back to shop">✅ Returned</span>`;
+  } else if (stage === 'picked_up') {
+    stageBadgeHtml = `<span class="badge badge-stage-picked" title="Stage 2: Customer picked up article & paid all dues">🛍️ Picked Up</span>`;
+  } else {
+    stageBadgeHtml = `<span class="badge badge-stage-booked" title="Stage 1: Article booked with advance given">📌 Booked</span>`;
+  }
+
+  const isPaid = numPrice > 0 && (numBalance === 0 || stage === 'picked_up' || stage === 'returned');
   const hasJewel = Number(item.has_jewellery || 0) === 1;
 
   const card = document.createElement('div');
-  card.className = 'article-studio-card';
+  card.className = `article-studio-card card-stage-${stage}`;
 
   card.innerHTML = `
     <div class="article-card-media" data-id="${item.id}">
@@ -82,6 +92,7 @@ export function createArticleCard(item, context) {
         <span class="badge badge-gold font-mono card-id-pill" title="Click to copy ID">
           ${escapeHtml(item.article_id)}
         </span>
+        ${stageBadgeHtml}
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
         ${hasJewel ? `
           <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.35); font-weight: 600;" title="Matching Jewellery Included">
@@ -150,13 +161,24 @@ export function createArticleCard(item, context) {
         </div>
       </div>
 
-      ${numBalance > 0 ? `
-        <button type="button" class="btn-clearout-card btn-clear-dues-action" title="Customer paid whole price — click to clear all dues">
-          ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
+      <!-- Stage Action Button -->
+      ${stage === 'booked' ? `
+        ${numBalance > 0 ? `
+          <button type="button" class="btn-clearout-card btn-clear-dues-action" title="Stage 2: Customer pays remaining dues and takes garment">
+            ${renderIcon('checkCheck', { size: 14 })} Clear Dues &amp; Pickup
+          </button>
+        ` : `
+          <button type="button" class="btn-pickup-card btn-mark-picked-action" title="Stage 2: Customer takes garment">
+            ${renderIcon('shoppingBag', { size: 14 })} Mark Picked Up
+          </button>
+        `}
+      ` : stage === 'picked_up' ? `
+        <button type="button" class="btn-return-card btn-mark-returned-action" title="Stage 3: Customer returned article back to shop">
+          ${renderIcon('rotateCcw', { size: 14 })} Article Back in Shop
         </button>
       ` : `
-        <div class="settled-status-pill">
-          ${renderIcon('checkCircle', { size: 13 })} Paid in Full (Dues Cleared)
+        <div class="returned-status-pill" title="Stage 3 Complete: Garment safely back in showroom">
+          ${renderIcon('checkCircle', { size: 13 })} Back in Shop (Returned)
         </div>
       `}
 
@@ -186,6 +208,8 @@ export function createArticleCard(item, context) {
   const tagBtn = card.querySelector('.btn-tag-action');
   const waBtn = card.querySelector('.btn-wa-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
+  const markPickedBtn = card.querySelector('.btn-mark-picked-action');
+  const markReturnedBtn = card.querySelector('.btn-mark-returned-action');
 
   const openDetails = () => {
     openArticleDetailModal(item, shopName, {
@@ -234,6 +258,49 @@ export function createArticleCard(item, context) {
       openClearoutModal(item, (updated) => {
         if (onUpdate) onUpdate(updated);
       });
+    });
+  }
+
+  if (markPickedBtn) {
+    markPickedBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      markPickedBtn.disabled = true;
+      try {
+        const res = await api.updateArticle(item.id, { status: 'picked_up' });
+        if (res.success && res.article) {
+          showToast(`Article ${item.article_id} marked as Picked Up (Taken by Customer)!`, 'success');
+          if (onUpdate) onUpdate(res.article);
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+        markPickedBtn.disabled = false;
+      }
+    });
+  }
+
+  if (markReturnedBtn) {
+    markReturnedBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!window.confirm(`Confirm garment ${item.article_id} has been returned back to shop?\n\nThis will remove its photo and remove its record from the database.`)) {
+        return;
+      }
+      markReturnedBtn.disabled = true;
+      markReturnedBtn.innerHTML = 'Returning...';
+      try {
+        const res = await api.returnArticle(item.id);
+        if (res.success) {
+          showToast(`Article ${item.article_id} returned. Photo and database record removed.`, 'success');
+          if (onDelete) onDelete(item.id);
+        } else {
+          alert(res.message || 'Failed to process return');
+          markReturnedBtn.disabled = false;
+          markReturnedBtn.innerHTML = 'Article Back in Shop';
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+        markReturnedBtn.disabled = false;
+        markReturnedBtn.innerHTML = 'Article Back in Shop';
+      }
     });
   }
 

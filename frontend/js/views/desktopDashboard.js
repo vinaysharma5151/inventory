@@ -11,9 +11,9 @@
 import { renderIcon } from '../icons.js';
 import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
-import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=9';
+import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=12';
 import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=9';
-import { createArticleCard } from './desktop/articleCard.js?v=12';
+import { createArticleCard } from './desktop/articleCard.js?v=14';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -25,6 +25,7 @@ export function createDesktopDashboard(containerEl, state) {
   // Filters State
   const filterState = {
     searchQuery: '',
+    stageFilter: 'all',
     selectedCategory: 'all',
     paymentFilter: 'all',
     jewelleryFilter: 'all',
@@ -95,6 +96,17 @@ export function createDesktopDashboard(containerEl, state) {
               class="search-input"
               placeholder="Search by Article ID (e.g. 0001), Customer, or Phone..."
             />
+          </div>
+
+          <!-- 3-Stage Workflow Chips Row -->
+          <div class="filter-chips-row stage-chips-row">
+            <div class="chips-group" id="stage-chips-container">
+              <span class="chips-label">Showroom Stage:</span>
+              <button type="button" class="filter-chip active" data-stage="all">All Stages</button>
+              <button type="button" class="filter-chip stage-chip-booked" data-stage="booked" title="Stage 1: Article booked with advance amount given">📌 1. Booked (Advance)</button>
+              <button type="button" class="filter-chip stage-chip-picked" data-stage="picked_up" title="Stage 2: Customer picked up article & paid all amount">🛍️ 2. Picked Up (Taken)</button>
+              <button type="button" class="filter-chip stage-chip-returned" data-stage="returned" title="Stage 3: Customer returned article back to shop">✅ 3. Returned (Back in Shop)</button>
+            </div>
           </div>
 
           <div class="filter-chips-row">
@@ -182,6 +194,7 @@ export function createDesktopDashboard(containerEl, state) {
 
   // DOM Elements for Filters
   const searchInput = containerEl.querySelector('#dashboard-search-input');
+  const stageChips = containerEl.querySelectorAll('#stage-chips-container .filter-chip');
   const catChips = containerEl.querySelectorAll('#category-chips-container .filter-chip');
   const payChips = containerEl.querySelectorAll('#payment-chips-container .filter-chip');
   const dateFieldSelect = containerEl.querySelector('#date-field-select');
@@ -245,10 +258,22 @@ export function createDesktopDashboard(containerEl, state) {
       const item = filteredList[i];
       const price = Number(item.price) || 0;
       const advance = Number(item.advance_amount) || 0;
-      const balance = (item.balance_amount !== undefined && item.balance_amount !== null)
-        ? Math.max(0, Number(item.balance_amount))
-        : Math.max(0, price - advance);
-      const done = (advance > 0) ? advance : Math.max(0, price - balance);
+      const st = (item.status || 'booked').toLowerCase();
+
+      let balance = 0;
+      let done = 0;
+
+      // In Stage 2 (picked_up) and Stage 3 (returned), customer paid full price
+      // In Stage 1 (booked), advance is collected, balance is pending
+      if (st === 'picked_up' || st === 'returned') {
+        done = price;
+        balance = 0;
+      } else {
+        balance = (item.balance_amount !== undefined && item.balance_amount !== null)
+          ? Math.max(0, Number(item.balance_amount))
+          : Math.max(0, price - advance);
+        done = (balance === 0) ? price : Math.min(price, Math.max(0, advance));
+      }
 
       totalAmount += price;
       paymentDone += done;
@@ -327,6 +352,15 @@ export function createDesktopDashboard(containerEl, state) {
   searchInput.addEventListener('input', (e) => {
     filterState.searchQuery = e.target.value;
     renderGrid();
+  });
+
+  stageChips.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      stageChips.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterState.stageFilter = btn.dataset.stage;
+      renderGrid();
+    });
   });
 
   catChips.forEach((btn) => {

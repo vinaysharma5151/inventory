@@ -57,6 +57,10 @@ function getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalanc
       secLine +
       `${dueLine}\n\n` +
       `----------------------------------------\n` +
+      `*TERMS & CONDITIONS:*\n` +
+      `1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n` +
+      `2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n` +
+      `----------------------------------------\n` +
       `*${storeBrand}*\n` +
       `Kindly present this e-receipt or Article Code during garment pickup.`
     )
@@ -79,7 +83,22 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     ? Number(article.balance_amount)
     : Math.max(0, numPrice - numAdvance);
 
-  const isFullyPaid = numPrice > 0 && numBalance === 0;
+  const stage = (article.status || 'booked').toLowerCase();
+  const isBooked = stage === 'booked';
+  const isPickedUp = stage === 'picked_up';
+  const isReturned = stage === 'returned';
+
+  let stageBadgeLabel = '📌 Stage 1: Booked';
+  let stageBadgeClass = 'badge-stage-booked';
+  if (isReturned) {
+    stageBadgeLabel = '✅ Stage 3: Returned (Back in Shop)';
+    stageBadgeClass = 'badge-stage-returned';
+  } else if (isPickedUp) {
+    stageBadgeLabel = '🛍️ Stage 2: Picked Up (Taken by Customer)';
+    stageBadgeClass = 'badge-stage-picked';
+  }
+
+  const isFullyPaid = numPrice > 0 && (numBalance === 0 || isPickedUp || isReturned);
   const hasJewel = Number(article.has_jewellery || 0) === 1;
 
   const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
@@ -96,6 +115,7 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
         <div class="modal-title">
           <span>Lehenga Booking Details</span>
           <span class="badge badge-gold font-mono">${escapeHtml(article.article_id)}</span>
+          <span class="badge ${stageBadgeClass}" style="margin-left: 6px;">${stageBadgeLabel}</span>
         </div>
         <button type="button" class="btn btn-ghost btn-icon-only close-btn">
           ${renderIcon('x', { size: 18 })}
@@ -122,6 +142,7 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
           <div>
             <div class="detail-tags-row">
               <span class="badge badge-gold">${escapeHtml(article.category || 'Bridal')}</span>
+              <span class="badge ${stageBadgeClass}">${stageBadgeLabel}</span>
               ${hasJewel ? `
                 <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.4); font-weight: 600;">
                   💍 Matching Jewellery
@@ -144,6 +165,73 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
                 </div>
               </div>
             ` : ''}
+          </div>
+
+          <!-- 3-STAGE WORKFLOW & ACTION BUTTONS IN DETAIL SECTION -->
+          <div class="detail-stage-tracker-card">
+            <div class="stage-tracker-top">
+              <div class="stage-tracker-header">
+                <span class="stage-tracker-title">Showroom 3-Stage Progress</span>
+                <span class="stage-tracker-subtitle">Control garment lifecycle directly</span>
+              </div>
+              <span class="badge ${stageBadgeClass} font-mono">${stageBadgeLabel}</span>
+            </div>
+
+            <!-- Visual 3-Stage Stepper -->
+            <div class="stage-stepper-row">
+              <div class="stepper-step ${isBooked ? 'active' : 'completed'}">
+                <div class="stepper-circle">${isBooked ? '1' : '✓'}</div>
+                <div class="stepper-text">
+                  <span class="stepper-title">1. Booked</span>
+                  <span class="stepper-sub">Advance Given</span>
+                </div>
+              </div>
+              <div class="stepper-connector ${isPickedUp || isReturned ? 'completed' : ''}"></div>
+              <div class="stepper-step ${isPickedUp ? 'active' : (isReturned ? 'completed' : '')}">
+                <div class="stepper-circle">${isReturned ? '✓' : '2'}</div>
+                <div class="stepper-text">
+                  <span class="stepper-title">2. Picked Up</span>
+                  <span class="stepper-sub">Customer Taken</span>
+                </div>
+              </div>
+              <div class="stepper-connector ${isReturned ? 'completed' : ''}"></div>
+              <div class="stepper-step ${isReturned ? 'active completed' : ''}">
+                <div class="stepper-circle">${isReturned ? '✓' : '3'}</div>
+                <div class="stepper-text">
+                  <span class="stepper-title">3. Returned</span>
+                  <span class="stepper-sub">Back in Shop</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detail Section Action Buttons: Pick Up & Return -->
+            <div class="stage-actions-button-grid">
+              <button
+                type="button"
+                class="btn btn-stage-action btn-stage-pickup-action ${isPickedUp ? 'is-current-stage' : ''}"
+                id="btn-detail-pickup-action"
+                title="Stage 2: Customer pays remaining dues and takes garment"
+              >
+                ${renderIcon('shoppingBag', { size: 18 })}
+                <div class="btn-stage-label-group">
+                  <span class="btn-stage-title">${isPickedUp ? '✓ Picked Up' : 'Pick Up'}</span>
+                  <span class="btn-stage-desc">${isPickedUp ? 'Taken by Customer' : (numBalance > 0 ? `Clear Due ₹${formatINR(numBalance)} &amp; Deliver` : 'Deliver to Customer')}</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="btn btn-stage-action btn-stage-return-action ${isReturned ? 'is-current-stage' : ''}"
+                id="btn-detail-return-action"
+                title="Stage 3: Customer returned article back to shop"
+              >
+                ${renderIcon('rotateCcw', { size: 18 })}
+                <div class="btn-stage-label-group">
+                  <span class="btn-stage-title">Return (Stage 3)</span>
+                  <span class="btn-stage-desc">Garment Back in Shop (Complete &amp; Clear)</span>
+                </div>
+              </button>
+            </div>
           </div>
 
           <!-- Payment Breakdown -->
@@ -178,10 +266,10 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
               <div class="clearout-detail-strip">
                 <div class="clearout-detail-text">
                   <span class="clearout-badge-due">Remaining Due: ₹${formatINR(numBalance)}</span>
-                  <span class="clearout-subtext">Customer paid whole price? Settle and clear all dues.</span>
+                  <span class="clearout-subtext">Customer taking garment now? Settle and clear all dues.</span>
                 </div>
                 <button type="button" class="btn btn-clearout-detail btn-clear-dues-trigger">
-                  ${renderIcon('checkCheck', { size: 16 })} Clearout Dues (Paid in Full)
+                  ${renderIcon('checkCheck', { size: 16 })} Clear Dues &amp; Pickup
                 </button>
               </div>
             ` : ''}
@@ -251,12 +339,6 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
         </div>
 
         <div class="footer-actions-right">
-          ${numBalance > 0 ? `
-            <button type="button" class="btn btn-clearout-footer btn-clear-dues-footer" title="Settle all dues">
-              ${renderIcon('checkCheck', { size: 14 })} Clearout Dues
-            </button>
-          ` : ''}
-
           ${article.customer_phone ? `
             <button type="button" class="btn btn-whatsapp btn-sm btn-send-wa" title="Send WhatsApp Bill">
               ${renderIcon('messageCircle', { size: 15 })} WhatsApp Bill
@@ -292,16 +374,80 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     });
   }
 
-  // Clear dues trigger
-  const clearTriggers = modalEl.querySelectorAll('.btn-clear-dues-trigger, .btn-clear-dues-footer');
-  clearTriggers.forEach((btn) => {
-    btn.addEventListener('click', () => {
+  // Pick Up handlers (Stage 2: Customer takes garment & pays remaining balance)
+  const handlePickup = async () => {
+    if (isPickedUp) {
+      showToast(`Article ${article.article_id} is already marked as Picked Up.`, 'neutral');
+      return;
+    }
+    if (isReturned) {
+      if (!window.confirm(`Article ${article.article_id} was marked Returned. Revert to Stage 2: Picked Up?`)) {
+        return;
+      }
+      try {
+        const res = await api.updateArticle(article.id, { status: 'picked_up' });
+        if (res.success && res.article) {
+          showToast(`Article ${article.article_id} status set to Picked Up.`, 'success');
+          closeModal();
+          if (onUpdate) onUpdate(res.article);
+          openArticleDetailModal(res.article, shopName, { onUpdate, onDelete, currentUser });
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+      return;
+    }
+
+    if (numBalance > 0) {
       openClearoutModal(article, (updatedArticle) => {
         closeModal();
         if (onUpdate) onUpdate(updatedArticle);
-        openArticleDetailModal(updatedArticle, shopName, { onUpdate, onDelete });
+        openArticleDetailModal(updatedArticle, shopName, { onUpdate, onDelete, currentUser });
       });
-    });
+    } else {
+      try {
+        const res = await api.pickupArticle(article.id);
+        if (res.success && res.article) {
+          showToast(`Article ${article.article_id} marked as Picked Up!`, 'success');
+          closeModal();
+          if (onUpdate) onUpdate(res.article);
+          openArticleDetailModal(res.article, shopName, { onUpdate, onDelete, currentUser });
+        }
+      } catch (err) {
+        alert('Error marking as picked up: ' + err.message);
+      }
+    }
+  };
+
+  const pickupTriggers = modalEl.querySelectorAll(
+    '#btn-detail-pickup-action, .btn-clear-dues-trigger'
+  );
+  pickupTriggers.forEach((btn) => {
+    btn.addEventListener('click', handlePickup);
+  });
+
+  // Return handlers (Stage 3: Customer Returned Article Back to Shop)
+  const handleReturn = async () => {
+    if (!window.confirm(`Confirm garment ${article.article_id} has been returned back to shop?\n\nThis will remove its photo and remove its record from the database.`)) {
+      return;
+    }
+    try {
+      const res = await api.returnArticle(article.id);
+      if (res.success) {
+        showToast(`Article ${article.article_id} returned. Photo and database record removed.`, 'success');
+        closeModal();
+        if (onDelete) onDelete(article.id);
+      } else {
+        alert(res.message || 'Failed to mark article as returned.');
+      }
+    } catch (err) {
+      alert('Error marking as returned: ' + err.message);
+    }
+  };
+
+  const returnTriggers = modalEl.querySelectorAll('#btn-detail-return-action');
+  returnTriggers.forEach((btn) => {
+    btn.addEventListener('click', handleReturn);
   });
 
   // Print bill trigger

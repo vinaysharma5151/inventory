@@ -104,8 +104,8 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
           </div>
         </div>
 
-        <!-- Row: Article ID & Category -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- Row: Article ID, Category & Showroom Stage -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
           <div>
             <label class="input-label" for="edit-article-id">Article Code *</label>
             <input
@@ -124,6 +124,14 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
               <option value="Reception" ${article.category === 'Reception' ? 'selected' : ''}>Reception</option>
               <option value="Sherwani" ${article.category === 'Sherwani' ? 'selected' : ''}>Sherwani</option>
               <option value="Casual" ${article.category === 'Casual' ? 'selected' : ''}>Casual</option>
+            </select>
+          </div>
+          <div>
+            <label class="input-label" for="edit-stage">Showroom Stage</label>
+            <select id="edit-stage" class="input-field" style="font-weight: 600;">
+              <option value="booked" ${(article.status || 'booked') === 'booked' ? 'selected' : ''}>📌 1. Booked</option>
+              <option value="picked_up" ${(article.status || 'booked') === 'picked_up' ? 'selected' : ''}>🛍️ 2. Picked Up</option>
+              <option value="returned" ${(article.status || 'booked') === 'returned' ? 'selected' : ''}>✅ 3. Returned</option>
             </select>
           </div>
         </div>
@@ -507,6 +515,7 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
       return_date: modalEl.querySelector('#edit-return-date').value || null,
       booking_date: modalEl.querySelector('#edit-booking-date').value || null,
       notes: modalEl.querySelector('#edit-notes').value.trim(),
+      status: modalEl.querySelector('#edit-stage') ? modalEl.querySelector('#edit-stage').value : (article.status || 'booked'),
     };
 
     try {

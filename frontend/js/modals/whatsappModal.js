@@ -323,6 +323,10 @@ function generateClientEbillText(article, shopName) {
     secLine +
     `${dueLine}\n` +
     `━━━━━━━━━━━━━━━━━━━\n` +
+    `📋 *TERMS & CONDITIONS:*\n` +
+    `1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n` +
+    `2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n` +
+    `━━━━━━━━━━━━━━━━━━━\n` +
     `🙏 _Thank you for choosing ${store}!_\n` +
     `📍 _Kindly present this e-receipt or Booking #${id} at pickup._`
   );

@@ -28,6 +28,7 @@ from backend.services.auth import (
     require_owner,
     require_staff_or_owner,
 )
+from backend.services.backup_service import update_inventory_csv_backup
 from backend.services.export_service import generate_inventory_csv_response
 from backend.services.image_service import save_article_image
 from backend.services.thermal_printer import get_active_printer, print_article_thermal
@@ -56,10 +57,11 @@ def list_articles(
     search: Optional[str] = None,
     category: Optional[str] = None,
     salesman: Optional[str] = None,
+    stage: Optional[str] = None,
     current_user: dict = Depends(require_staff_or_owner),
 ):
     """
-    List articles with optional search and category filters.
+    List articles with optional search, category, and stage filters.
     Accessible by staff and owner.
     """
     db = get_db()
@@ -84,6 +86,10 @@ def list_articles(
     if salesman:
         query += " AND salesman_name = ?"
         params.append(salesman)
+
+    if stage and stage.lower() != "all":
+        query += " AND status = ?"
+        params.append(stage.lower())
 
     query += " ORDER BY created_at DESC"
     rows = db.execute(query, params).fetchall()
@@ -195,8 +201,8 @@ async def create_article(
             advance_amount, balance_amount, notes,
             image_path, source, customer_name, customer_phone, customer_address,
             pickup_date, booking_date, return_date, salesman_name,
-            has_jewellery, jewellery_details, jewellery_price)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            status, has_jewellery, jewellery_details, jewellery_price)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             final_id,
             final_title,
@@ -215,6 +221,7 @@ async def create_article(
             booking_date or None,
             return_date or None,
             creator_name,
+            "booked",
             has_jewel_val,
             jewel_details_val,
             jewel_price_val,
@@ -267,7 +274,7 @@ async def update_article(
         "article_id", "title", "category", "price", "security_deposit",
         "advance_amount", "balance_amount", "notes",
         "customer_name", "customer_phone", "customer_address", "pickup_date", "booking_date",
-        "return_date", "salesman_name",
+        "return_date", "salesman_name", "status",
         "has_jewellery", "jewellery_details", "jewellery_price",
     }
     fields = [k for k in updates if k in allowed]
@@ -409,8 +416,8 @@ async def clear_dues(
     current_user: dict = Depends(require_owner),
 ):
     """
-    Clear all remaining balance dues for an article.
-    Protected with require_owner to prevent unauthorized dues clearance.
+    Stage 2: Customer picks up the article and pays all remaining dues.
+    Clears balance to 0, sets status to 'picked_up' (taken by customer).
     """
     article = _get_or_404(article_id)
     db = get_db()
@@ -418,16 +425,16 @@ async def clear_dues(
     old_balance = float(article.get("balance_amount") or 0)
 
     existing_notes = (article.get("notes") or "").strip()
-    reason = f"Dues cleared by Owner ({current_user['username']})"
+    reason = f"Dues cleared & garment taken by customer (Owner: {current_user['username']})"
     if payload and payload.notes and payload.notes.strip():
         reason += f": {payload.notes.strip()}"
     new_notes = f"{existing_notes} [{reason}]".strip() if existing_notes else f"[{reason}]"
 
-    # Set advance equal to price so balance becomes 0
+    # Set advance equal to price so balance becomes 0, and transition to Stage 2: picked_up
     db.execute(
         """
         UPDATE articles
-        SET advance_amount = ?, balance_amount = 0, notes = ?, updated_at = CURRENT_TIMESTAMP
+        SET advance_amount = ?, balance_amount = 0, status = 'picked_up', notes = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
         (price, new_notes, article_id),
@@ -439,11 +446,11 @@ async def clear_dues(
     ip = get_client_ip(request) if request else None
     log_audit_event(
         db,
-        action="CLEAR_DUES",
+        action="CLEAR_DUES_PICKUP",
         username=current_user.get("username"),
         role="owner",
         target_id=str(article_id),
-        details=f"Cleared dues of ₹{old_balance} for article {article.get('article_id')}",
+        details=f"Cleared dues of ₹{old_balance} and marked as Picked Up (Taken by Customer) for article {article.get('article_id')}",
         ip_address=ip,
     )
 
@@ -451,8 +458,122 @@ async def clear_dues(
 
     return {
         "success": True,
-        "message": f"Dues of ₹{old_balance} cleared successfully.",
+        "message": f"Dues of ₹{old_balance} cleared. Article marked as Picked Up (Taken by Customer).",
         "article": updated,
+    }
+
+
+@router.post("/articles/{article_id}/pickup")
+async def pickup_article(
+    article_id: int,
+    payload: Optional[ClearDuesRequest] = None,
+    request: Request = None,
+    current_user: dict = Depends(require_staff_or_owner),
+):
+    """
+    Stage 2: Customer picks up the article.
+    If there are remaining dues and user is owner, clears them to 0.
+    If balance is already 0, marks as 'picked_up'.
+    """
+    article = _get_or_404(article_id)
+    db = get_db()
+    price = float(article.get("price") or 0)
+    old_balance = float(article.get("balance_amount") or 0)
+
+    if old_balance > 0 and current_user.get("role") != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner authorization is required to clear pending balance dues.",
+        )
+
+    existing_notes = (article.get("notes") or "").strip()
+    reason = f"Garment picked up by customer (Handled by: {current_user['username']})"
+    if payload and payload.notes and payload.notes.strip():
+        reason += f": {payload.notes.strip()}"
+    new_notes = f"{existing_notes} [{reason}]".strip() if existing_notes else f"[{reason}]"
+
+    db.execute(
+        """
+        UPDATE articles
+        SET advance_amount = ?, balance_amount = 0, status = 'picked_up', notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (price, new_notes, article_id),
+    )
+    db.commit()
+
+    updated = _get_or_404(article_id)
+
+    ip = get_client_ip(request) if request else None
+    log_audit_event(
+        db,
+        action="PICKUP_ARTICLE",
+        username=current_user.get("username"),
+        role=current_user.get("role"),
+        target_id=str(article_id),
+        details=f"Article {article.get('article_id')} picked up by customer (dues ₹{old_balance} settled)",
+        ip_address=ip,
+    )
+
+    await broadcast("UPDATE_ARTICLE", updated)
+
+    return {
+        "success": True,
+        "message": f"Article {article.get('article_id')} marked as Picked Up (Taken by Customer).",
+        "article": updated,
+    }
+
+
+@router.post("/articles/{article_id}/return")
+@router.post("/articles/{article_id}/return-and-delete")
+async def return_article(
+    article_id: int,
+    payload: Optional[ClearDuesRequest] = None,
+    request: Request = None,
+    current_user: dict = Depends(require_staff_or_owner),
+):
+    """
+    Stage 3: Customer returns the article back to the showroom.
+    Once returned, the garment's booking cycle is complete.
+    Removes the article's uploaded photo from disk and removes its record from the database.
+    Does NOT touch, modify, or harm any backup files in backups/.
+    """
+    article = _get_or_404(article_id)
+
+    # 1. Remove photo file from uploads/ (skip sample_ seeded images)
+    img = article.get("image_path", "")
+    if img and "sample_" not in img:
+        try:
+            full_path = DATA_DIR / img.lstrip("/")
+            if full_path.exists():
+                full_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # 2. Delete article data from SQLite database (backup files are never touched)
+    db = get_db()
+    db.execute("DELETE FROM articles WHERE id = ?", (article_id,))
+    db.commit()
+
+    ip = get_client_ip(request) if request else None
+    log_audit_event(
+        db,
+        action="RETURN_ARTICLE",
+        username=current_user.get("username"),
+        role=current_user.get("role"),
+        target_id=str(article_id),
+        details=f"Article {article.get('article_id')} returned by customer — photo and database record removed",
+        ip_address=ip,
+    )
+
+    # 3. Notify real-time SSE clients to remove the article card
+    await broadcast("DELETE_ARTICLE", {"id": article_id})
+
+    return {
+        "success": True,
+        "deleted": True,
+        "message": f"Article {article.get('article_id')} returned. Photo and database record removed.",
+        "id": article_id,
     }
 
 
@@ -497,9 +618,13 @@ async def delete_article(
 @router.get("/export/csv")
 def export_csv(current_user: dict = Depends(require_owner)):
     """
-    Download complete showroom inventory as CSV.
+    Download complete showroom inventory as CSV and syncs inventory_backup.csv.
     Protected with require_owner and formula injection sanitization.
     """
+    try:
+        update_inventory_csv_backup()
+    except Exception:
+        pass
     return generate_inventory_csv_response()
 
 

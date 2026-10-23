@@ -30,9 +30,28 @@ class ArticleUpdate(BaseModel):
     booking_date:     Optional[str]   = None
     return_date:      Optional[str]   = None
     salesman_name:    Optional[str]   = None
+    status:           Optional[str]   = None
     has_jewellery:    Optional[int]   = None
     jewellery_details:Optional[str]   = None
     jewellery_price:  Optional[float] = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v):
+        """Validate and normalize booking stage/status: booked, picked_up, returned."""
+        if v is not None:
+            clean = str(v).strip().lower()
+            if clean in ("booked", "picked_up", "returned"):
+                return clean
+            # Handle user variations
+            if "pick" in clean or "taken" in clean:
+                return "picked_up"
+            if "return" in clean or "back" in clean:
+                return "returned"
+            if "book" in clean:
+                return "booked"
+            raise ValueError(f"Invalid stage status: {v}. Must be booked, picked_up, or returned.")
+        return v
 
     @field_validator("price", "security_deposit", "advance_amount", "balance_amount", "jewellery_price", mode="before")
     @classmethod
