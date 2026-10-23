@@ -57,6 +57,7 @@ hiddenimports = [
     "backend.services.export_service",
     "backend.services.image_service",
     "backend.services.qr_service",
+    "backend.services.thermal_printer",
     "backend.services.whatsapp",
     "logging.handlers",
 ]
@@ -100,7 +101,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # Disabled: prevents Windows Defender & Antivirus heuristic false-positive kills
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Displays server startup, active port, and mobile pairing IP address

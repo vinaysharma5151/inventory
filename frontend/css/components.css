@@ -270,3 +270,138 @@
   background: var(--bg-hover);
 }
 
+/* ════════════════════════════════════════
+   MATCHING JEWELLERY SECTION & TOGGLES
+════════════════════════════════════════ */
+.jewellery-addon-box {
+  background: linear-gradient(135deg, rgba(255, 253, 245, 0.95), rgba(255, 248, 230, 0.85));
+  border: 1.5px solid #E6D5A8;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+  transition: all var(--transition-normal);
+}
+
+.jewellery-addon-box.active {
+  border-color: #B8860B;
+  box-shadow: 0 4px 14px rgba(184, 134, 11, 0.12);
+}
+
+.jewellery-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.jewellery-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.jewellery-icon-badge {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.jewellery-title-text {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1e1e1e;
+  line-height: 1.2;
+}
+
+.jewellery-sub-text {
+  font-size: 0.74rem;
+  color: #8C6A2A;
+  margin-top: 2px;
+}
+
+.jewellery-body-content {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #E6D5A8;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeIn 0.2s ease;
+}
+
+.jewel-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.jewel-select-chip {
+  padding: 5px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid #D1C090;
+  background: #FFFFFF;
+  color: #5C4616;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.jewel-select-chip:hover {
+  border-color: #B8860B;
+  background: #FFF9E6;
+}
+
+.jewel-select-chip.active {
+  background: #8C6A2A;
+  border-color: #8C6A2A;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(140, 106, 42, 0.25);
+}
+
+/* Switch toggle styling */
+.switch-control {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch-control input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #D1D5DB;
+  transition: 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 24px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.switch-control input:checked + .switch-slider {
+  background-color: #B8860B;
+}
+
+.switch-control input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+

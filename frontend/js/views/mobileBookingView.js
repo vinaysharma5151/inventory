@@ -154,8 +154,49 @@ export function createMobileBookingView(containerEl, state) {
               <div class="category-chips-row" id="m-category-chips">
                 <button type="button" class="category-chip active" data-cat="Bridal">Bridal</button>
                 <button type="button" class="category-chip" data-cat="Reception">Reception</button>
-                <button type="button" class="category-chip" data-cat="Jewellery">Jewellery</button>
+                <button type="button" class="category-chip" data-cat="Sherwani">Sherwani</button>
                 <button type="button" class="category-chip" data-cat="Casual">Casual</button>
+              </div>
+            </div>
+
+            <!-- Matching Jewellery Add-on -->
+            <div class="jewellery-addon-box" id="m-jewel-box">
+              <div class="jewellery-toggle-header" id="m-jewel-toggle-header">
+                <div class="jewellery-header-title">
+                  <span class="jewellery-icon-badge">💍</span>
+                  <div>
+                    <div class="jewellery-title-text">Matching Jewellery Set</div>
+                    <div class="jewellery-sub-text">Add paired jewellery with this outfit</div>
+                  </div>
+                </div>
+                <label class="switch-control">
+                  <input type="checkbox" id="m-toggle-jewel" />
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="jewellery-body-content" id="m-jewel-body" style="display: none;">
+                <label class="input-label" style="font-size: 0.74rem;">Select Jewellery Set Type</label>
+                <div class="jewel-chips-grid" id="m-jewel-chips">
+                  <button type="button" class="jewel-select-chip active" data-val="Full Bridal Set">Full Bridal Set</button>
+                  <button type="button" class="jewel-select-chip" data-val="Choker & Necklace">Choker &amp; Necklace</button>
+                  <button type="button" class="jewel-select-chip" data-val="Matha Patti & Nath">Matha Patti &amp; Nath</button>
+                  <button type="button" class="jewel-select-chip" data-val="Earrings & Tikka">Earrings &amp; Tikka</button>
+                  <button type="button" class="jewel-select-chip" data-val="Other / Custom">Other / Custom</button>
+                </div>
+                <div>
+                  <input type="text" id="m-jewel-desc" class="input-field" placeholder="Jewellery description / set code..." value="Full Bridal Set" style="font-size: 0.85rem;" />
+                </div>
+                <div>
+                  <label class="input-label" for="m-jewel-price" style="font-size: 0.74rem;">Jewellery Rental Extra Price (₹) *</label>
+                  <div class="currency-input-container">
+                    <span class="currency-symbol-prefix">₹</span>
+                    <input type="number" id="m-jewel-price" min="0" step="100" class="input-field" placeholder="e.g. 3000" value="0" />
+                  </div>
+                  <div style="font-size: 0.72rem; color: #8C6A2A; margin-top: 3px;" id="m-jewel-calc-hint">
+                    💡 Added to article price for total bill.
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -171,7 +212,7 @@ export function createMobileBookingView(containerEl, state) {
 
               <div class="payment-calc-grid">
                 <div>
-                  <label class="input-label" for="m-price-input">Article Price (₹) *</label>
+                  <label class="input-label" for="m-price-input">Garment Price (₹) *</label>
                   <div class="currency-input-container">
                     <span class="currency-symbol-prefix">₹</span>
                     <input type="number" id="m-price-input" min="0" step="100" class="input-field" placeholder="e.g. 55000" required />
@@ -332,6 +373,58 @@ export function createMobileBookingView(containerEl, state) {
       });
     });
 
+    // Jewellery Controls
+    const jewelBox = containerEl.querySelector('#m-jewel-box');
+    const jewelToggle = containerEl.querySelector('#m-toggle-jewel');
+    const jewelBody = containerEl.querySelector('#m-jewel-body');
+    const jewelChips = containerEl.querySelectorAll('#m-jewel-chips .jewel-select-chip');
+    const jewelDescInput = containerEl.querySelector('#m-jewel-desc');
+    const jewelPriceInput = containerEl.querySelector('#m-jewel-price');
+    const jewelHeader = containerEl.querySelector('#m-jewel-toggle-header');
+
+    const updateJewelState = () => {
+      if (jewelToggle.checked) {
+        jewelBox.classList.add('active');
+        jewelBody.style.display = 'flex';
+        if (!jewelPriceInput.value || parseFloat(jewelPriceInput.value) === 0) {
+          jewelPriceInput.focus();
+        }
+      } else {
+        jewelBox.classList.remove('active');
+        jewelBody.style.display = 'none';
+      }
+      paymentController?.update();
+      updateSubmitState();
+    };
+
+    jewelToggle.addEventListener('change', updateJewelState);
+    jewelHeader.addEventListener('click', (e) => {
+      if (e.target !== jewelToggle && !e.target.closest('.switch-control')) {
+        jewelToggle.checked = !jewelToggle.checked;
+        updateJewelState();
+      }
+    });
+
+    jewelChips.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        jewelChips.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const val = btn.dataset.val;
+        if (val === 'Other / Custom') {
+          jewelDescInput.value = '';
+          jewelDescInput.placeholder = 'Enter jewellery details...';
+          jewelDescInput.focus();
+        } else {
+          jewelDescInput.value = val;
+        }
+      });
+    });
+
+    jewelPriceInput.addEventListener('input', () => {
+      paymentController?.update();
+      updateSubmitState();
+    });
+
     custNameInput.addEventListener('input', () => updateSubmitState());
 
     // Validation
@@ -344,7 +437,7 @@ export function createMobileBookingView(containerEl, state) {
         submitLabel.textContent = 'Take Garment Photo';
         submitBtn.disabled = true;
       } else if (!hasPrice) {
-        submitLabel.textContent = 'Enter Article Price';
+        submitLabel.textContent = 'Enter Garment Price';
         submitBtn.disabled = true;
       } else if (!hasCustomer) {
         submitLabel.textContent = 'Enter Customer Name';
@@ -358,6 +451,8 @@ export function createMobileBookingView(containerEl, state) {
     // Reset Form for next booking
     const resetForm = () => {
       cameraController?.reset();
+      jewelToggle.checked = false;
+      updateJewelState();
       paymentController?.reset();
       custNameInput.value = '';
       custPhoneInput.value = '';
@@ -368,11 +463,18 @@ export function createMobileBookingView(containerEl, state) {
 
     // Submit Booking
     submitBtn.addEventListener('click', async () => {
-      const { price: p, advance: adv, balance: bal } = paymentController.getValues();
+      const payValues = paymentController.getValues();
+      const p = payValues.price;
+      const adv = payValues.advance;
+      const bal = payValues.balance;
       const name = custNameInput.value.trim();
       const photoBlob = cameraController?.getPhotoBlob();
 
       if (!photoBlob || p <= 0 || !name) return;
+
+      const hasJewel = jewelToggle.checked ? 1 : 0;
+      const jewelDetails = hasJewel ? (jewelDescInput.value.trim() || 'Full Bridal Set') : '';
+      const jewelPrice = hasJewel ? (parseFloat(jewelPriceInput.value) || 0) : 0;
 
       const finalId = articleIdInput.value.trim().toUpperCase() || '0001';
 
@@ -386,6 +488,9 @@ export function createMobileBookingView(containerEl, state) {
       formData.append('price', p);
       formData.append('advance_amount', adv);
       formData.append('balance_amount', bal);
+      formData.append('has_jewellery', hasJewel);
+      formData.append('jewellery_details', jewelDetails);
+      formData.append('jewellery_price', jewelPrice);
       formData.append('customer_name', name);
       formData.append('customer_phone', custPhoneInput.value.trim());
       formData.append('customer_address', custAddrInput.value.trim());

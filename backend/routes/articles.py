@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
@@ -30,6 +30,7 @@ from backend.services.auth import (
 )
 from backend.services.export_service import generate_inventory_csv_response
 from backend.services.image_service import save_article_image
+from backend.services.thermal_printer import get_active_printer, print_article_thermal
 from backend.sse import broadcast
 
 router = APIRouter()
@@ -130,6 +131,9 @@ async def create_article(
     booking_date:     Optional[str]   = Form(None),
     return_date:      Optional[str]   = Form(None),
     salesman_name:    Optional[str]   = Form(None),
+    has_jewellery:    Optional[Any]   = Form(0),
+    jewellery_details:Optional[str]   = Form(None),
+    jewellery_price:  Optional[Any]   = Form(0),
     current_user:     dict            = Depends(require_staff_or_owner),
 ):
     """
@@ -173,13 +177,26 @@ async def create_article(
     else:
         final_title = title_clean
 
+    try:
+        has_jewel_val = 1 if int(str(has_jewellery or 0).strip() or 0) == 1 else 0
+    except Exception:
+        has_jewel_val = 0
+
+    jewel_details_val = (jewellery_details or "").strip() if has_jewel_val else ""
+
+    try:
+        jewel_price_val = max(0.0, float(str(jewellery_price or 0).strip() or 0)) if has_jewel_val else 0.0
+    except Exception:
+        jewel_price_val = 0.0
+
     db.execute(
         """INSERT INTO articles
            (article_id, title, category, price, security_deposit,
             advance_amount, balance_amount, notes,
             image_path, source, customer_name, customer_phone, customer_address,
-            pickup_date, booking_date, return_date, salesman_name)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            pickup_date, booking_date, return_date, salesman_name,
+            has_jewellery, jewellery_details, jewellery_price)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             final_id,
             final_title,
@@ -198,6 +215,9 @@ async def create_article(
             booking_date or None,
             return_date or None,
             creator_name,
+            has_jewel_val,
+            jewel_details_val,
+            jewel_price_val,
         ),
     )
     db.commit()
@@ -248,6 +268,7 @@ async def update_article(
         "advance_amount", "balance_amount", "notes",
         "customer_name", "customer_phone", "customer_address", "pickup_date", "booking_date",
         "return_date", "salesman_name",
+        "has_jewellery", "jewellery_details", "jewellery_price",
     }
     fields = [k for k in updates if k in allowed]
     if not fields:
@@ -480,3 +501,49 @@ def export_csv(current_user: dict = Depends(require_owner)):
     Protected with require_owner and formula injection sanitization.
     """
     return generate_inventory_csv_response()
+
+
+@router.post("/articles/{article_id}/print-thermal")
+def print_article_direct_thermal(
+    article_id: int,
+    request: Request,
+    payload: dict = None,
+    current_user: dict = Depends(require_staff_or_owner),
+):
+    """
+    Direct 1-click silent printing to PIXEL DP82 thermal printer via Windows Spooler.
+    Formats exact ESC/POS layout, 6-line cutter feed, and auto-cut.
+    """
+    article = _get_or_404(article_id)
+
+    db = get_db()
+    shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
+    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Mehak Bridal Studio"
+
+    target_printer = None
+    if payload and payload.get("printer_name"):
+        target_printer = payload.get("printer_name").strip()
+
+    ok, msg = print_article_thermal(article, shop_name, target_printer)
+    if not ok:
+        raise HTTPException(status_code=500, detail=msg)
+
+    active_p = target_printer or get_active_printer() or "PIXEL DP82"
+
+    ip = get_client_ip(request)
+    log_audit_event(
+        db,
+        action="PRINT_THERMAL_BILL",
+        username=current_user.get("username"),
+        role=current_user.get("role"),
+        target_id=str(article_id),
+        details=f"Direct thermal bill printed for article {article.get('article_id')} on {active_p}",
+        ip_address=ip,
+    )
+
+    return {
+        "success": True,
+        "printer": active_p,
+        "message": msg,
+    }
+

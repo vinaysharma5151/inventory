@@ -28,6 +28,13 @@ from backend.services.auth import (
 )
 from backend.services.backup_service import create_database_backup
 from backend.services.qr_service import generate_qr_data_url
+from backend.services.thermal_printer import (
+    build_test_receipt,
+    get_active_printer,
+    get_installed_printers,
+    send_raw_escpos_to_printer,
+    set_active_printer,
+)
 
 router = APIRouter()
 
@@ -292,3 +299,60 @@ def trigger_manual_backup(
         "backup_name": backup_name,
         "message": f"Backup snapshot created successfully as '{backup_name}' in the backups/ folder.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Thermal Printer Management (PIXEL DP82 / ESC/POS Spooler)
+# ---------------------------------------------------------------------------
+@router.get("/system/printers")
+def list_system_printers():
+    """Returns all installed OS printers and the currently selected/detected thermal printer."""
+    installed = get_installed_printers()
+    active = get_active_printer()
+    return {
+        "success": True,
+        "printers": installed,
+        "active_printer": active,
+    }
+
+
+@router.post("/system/printers/select")
+def select_system_printer(payload: dict):
+    """Saves user-selected thermal printer preference in settings table."""
+    printer_name = (payload.get("printer_name") or "").strip()
+    if not printer_name:
+        raise HTTPException(status_code=400, detail="Printer name is required.")
+
+    ok = set_active_printer(printer_name)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to save thermal printer preference.")
+
+    return {
+        "success": True,
+        "active_printer": printer_name,
+        "message": f"Active thermal printer set to '{printer_name}'.",
+    }
+
+
+@router.post("/system/printers/test")
+def test_thermal_printer(payload: dict = None):
+    """Prints a test ticket and performs cutter clearance test on PIXEL DP82."""
+    target = None
+    if payload and payload.get("printer_name"):
+        target = payload.get("printer_name").strip()
+    target = target or get_active_printer()
+
+    if not target:
+        raise HTTPException(status_code=400, detail="No thermal printer detected. Please connect your PIXEL DP82 via USB.")
+
+    raw_ticket = build_test_receipt(target)
+    ok, msg = send_raw_escpos_to_printer(target, raw_ticket)
+    if not ok:
+        raise HTTPException(status_code=500, detail=msg)
+
+    return {
+        "success": True,
+        "printer": target,
+        "message": msg,
+    }
+

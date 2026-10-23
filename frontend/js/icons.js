@@ -9,6 +9,8 @@
 
 const ICONS = {
   crown: `<path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/>`,
+  indianRupee: `<path d="M6 3h12"/><path d="M6 8h12"/><path d="m6 13 8.5 8"/><path d="M6 13h3"/><path d="M9 13c6.667 0 6.667-10 0-10"/>`,
+  layers: `<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>`,
   search: `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>`,
   plus: `<path d="M5 12h14M12 5v14"/>`,
   qrcode: `<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>`,

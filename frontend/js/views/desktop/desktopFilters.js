@@ -46,7 +46,8 @@ export function filterArticles(articles, state) {
       const matchTitle = (item.title || '').toLowerCase().includes(q);
       const matchCustomer = (item.customer_name || '').toLowerCase().includes(q);
       const matchPhone = (item.customer_phone || '').toLowerCase().includes(q);
-      if (!matchId && !matchTitle && !matchCustomer && !matchPhone) {
+      const matchJewellery = Boolean(item.has_jewellery && (item.jewellery_details || 'jewellery').toLowerCase().includes(q));
+      if (!matchId && !matchTitle && !matchCustomer && !matchPhone && !matchJewellery) {
         return false;
       }
     }
@@ -60,6 +61,11 @@ export function filterArticles(articles, state) {
       } else if (!itemCat.includes(selCat)) {
         return false;
       }
+    }
+
+    // 2b. Matching Jewellery Filter
+    if (state.jewelleryFilter === 'only' && Number(item.has_jewellery || 0) !== 1) {
+      return false;
     }
 
     // 3. Payment Status Filter

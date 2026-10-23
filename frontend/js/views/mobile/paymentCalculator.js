@@ -25,23 +25,27 @@ export function initPaymentCalculator(containerEl, callbacks = {}) {
 
   const update = () => {
     const p = parseFloat(priceInput.value) || 0;
+    const jToggle = containerEl.querySelector('#m-toggle-jewel');
+    const jPrice = (jToggle?.checked ? (parseFloat(containerEl.querySelector('#m-jewel-price')?.value) || 0) : 0);
+    const totalP = p + jPrice;
+
     const adv = parseFloat(advanceInput.value) || 0;
-    const bal = Math.max(0, p - adv);
+    const bal = Math.max(0, totalP - adv);
 
     if (num) num.textContent = formatINR(bal);
 
     if (badge && box && sub) {
-      if (p <= 0) {
+      if (totalP <= 0) {
         badge.className = 'badge badge-neutral';
         badge.textContent = 'Enter Price';
         box.className = 'balance-result-box';
         sub.textContent = 'Enter price to calculate balance';
-      } else if (adv > p) {
+      } else if (adv > totalP) {
         badge.className = 'badge badge-warning';
         badge.textContent = 'Excess Advance';
         box.className = 'balance-result-box overpaid';
-        sub.textContent = `Advance exceeds price by ₹${formatINR(adv - p)}`;
-      } else if (p > 0 && adv >= p) {
+        sub.textContent = `Advance exceeds total price by ₹${formatINR(adv - totalP)}`;
+      } else if (totalP > 0 && adv >= totalP) {
         badge.className = 'badge badge-success';
         badge.textContent = 'Fully Paid';
         box.className = 'balance-result-box paid';
@@ -50,12 +54,13 @@ export function initPaymentCalculator(containerEl, callbacks = {}) {
         badge.className = 'badge badge-gold';
         badge.textContent = `₹${formatINR(bal)} Due`;
         box.className = 'balance-result-box pending';
-        sub.textContent = `₹${formatINR(adv)} advance paid • ₹${formatINR(bal)} due at delivery`;
+        const jewelNote = (jToggle?.checked && jPrice > 0) ? ` (Includes ₹${formatINR(jPrice)} Jewellery)` : '';
+        sub.textContent = `₹${formatINR(adv)} advance paid • ₹${formatINR(bal)} due at delivery${jewelNote}`;
       }
     }
 
     if (callbacks.onPaymentChange) {
-      callbacks.onPaymentChange({ price: p, advance: adv, balance: bal });
+      callbacks.onPaymentChange({ price: totalP, advance: adv, balance: bal, garmentPrice: p, jewelPrice: jPrice });
     }
   };
 
@@ -66,10 +71,14 @@ export function initPaymentCalculator(containerEl, callbacks = {}) {
     btn.addEventListener('click', () => {
       const pct = parseInt(btn.dataset.pct, 10);
       const p = parseFloat(priceInput.value) || 0;
+      const jToggle = containerEl.querySelector('#m-toggle-jewel');
+      const jPrice = (jToggle?.checked ? (parseFloat(containerEl.querySelector('#m-jewel-price')?.value) || 0) : 0);
+      const totalP = p + jPrice;
+
       if (pct === 0) {
         advanceInput.value = '0';
-      } else if (p > 0) {
-        advanceInput.value = String(Math.round((p * pct) / 100));
+      } else if (totalP > 0) {
+        advanceInput.value = String(Math.round((totalP * pct) / 100));
       }
       update();
     });
@@ -78,8 +87,18 @@ export function initPaymentCalculator(containerEl, callbacks = {}) {
   return {
     getValues() {
       const p = parseFloat(priceInput.value) || 0;
+      const jToggle = containerEl.querySelector('#m-toggle-jewel');
+      const jPrice = (jToggle?.checked ? (parseFloat(containerEl.querySelector('#m-jewel-price')?.value) || 0) : 0);
+      const totalP = p + jPrice;
       const adv = parseFloat(advanceInput.value) || 0;
-      return { price: p, advance: adv, balance: Math.max(0, p - adv) };
+      return {
+        price: totalP,
+        advance: adv,
+        balance: Math.max(0, totalP - adv),
+        garmentPrice: p,
+        jewelPrice: jPrice,
+        hasJewellery: Boolean(jToggle?.checked),
+      };
     },
     reset() {
       priceInput.value = '';

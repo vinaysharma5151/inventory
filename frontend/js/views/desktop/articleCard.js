@@ -8,11 +8,12 @@
 
 import { api } from '../../api.js?v=7';
 import { renderIcon } from '../../icons.js';
-import { printThermalBill, printGarmentTag } from '../../tag.js?v=9';
+import { printThermalBill, printGarmentTag } from '../../tag.js?v=10';
 import { showToast } from '../../toast.js';
-import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=9';
+import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=10';
 import { openClearoutModal } from '../../modals/clearoutModal.js?v=8';
-import { openEditArticleModal } from '../../modals/editArticleModal.js?v=8';
+import { openEditArticleModal } from '../../modals/editArticleModal.js?v=9';
+import { openWhatsAppBillModal } from '../../modals/whatsappModal.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -56,6 +57,7 @@ export function createArticleCard(item, context) {
   );
 
   const isPaid = numPrice > 0 && numBalance === 0;
+  const hasJewel = Number(item.has_jewellery || 0) === 1;
 
   const card = document.createElement('div');
   card.className = 'article-studio-card';
@@ -81,6 +83,11 @@ export function createArticleCard(item, context) {
           ${escapeHtml(item.article_id)}
         </span>
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
+        ${hasJewel ? `
+          <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.35); font-weight: 600;" title="Matching Jewellery Included">
+            💍 Jewellery
+          </span>
+        ` : ''}
       </div>
 
       <div class="card-header-block">
@@ -88,7 +95,7 @@ export function createArticleCard(item, context) {
           ${escapeHtml(personDisplayName)}
         </h3>
 
-        ${(item.customer_phone || hasDistinctOutfit) ? `
+        ${(item.customer_phone || hasDistinctOutfit || hasJewel) ? `
           <div class="card-customer-meta">
             ${item.customer_phone ? `
               <span class="phone-chip font-mono" title="Customer Phone">
@@ -98,6 +105,11 @@ export function createArticleCard(item, context) {
             ${hasDistinctOutfit ? `
               <span class="outfit-chip" title="Outfit: ${escapeHtml(item.title)}">
                 👗 ${escapeHtml(item.title)}
+              </span>
+            ` : ''}
+            ${hasJewel ? `
+              <span class="jewellery-chip" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; background: #FFF9E6; color: #8C6A2A; border: 1px solid #E6D5A8; padding: 2px 7px; border-radius: 6px; font-weight: 500;" title="Jewellery: ${escapeHtml(item.jewellery_details || 'Matching Set')}">
+                💍 ${escapeHtml(item.jewellery_details || 'Jewellery Set')}${Number(item.jewellery_price) > 0 ? ` (+₹${formatINR(item.jewellery_price)})` : ''}
               </span>
             ` : ''}
           </div>
@@ -158,6 +170,9 @@ export function createArticleCard(item, context) {
         <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Thermal Bill / Receipt (Direct to Printer)">
           ${renderIcon('printer', { size: 13 })} Bill
         </button>
+        <button type="button" class="btn btn-whatsapp-card btn-sm card-action-btn btn-wa-action" title="Send Formatted E-Bill via WhatsApp">
+          ${renderIcon('messageCircle', { size: 13, color: '#FFFFFF' })} WA
+        </button>
       </div>
     </div>
   `;
@@ -169,6 +184,7 @@ export function createArticleCard(item, context) {
   const detailsBtn = card.querySelector('.btn-details-action');
   const editBtn = card.querySelector('.btn-edit-action');
   const tagBtn = card.querySelector('.btn-tag-action');
+  const waBtn = card.querySelector('.btn-wa-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
 
   const openDetails = () => {
@@ -204,6 +220,13 @@ export function createArticleCard(item, context) {
     e.stopPropagation();
     printGarmentTag(item, shopName);
   });
+
+  if (waBtn) {
+    waBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openWhatsAppBillModal(item, shopName);
+    });
+  }
 
   if (clearDuesBtn) {
     clearDuesBtn.addEventListener('click', (e) => {

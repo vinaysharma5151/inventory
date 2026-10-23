@@ -12,6 +12,7 @@ import { showToast } from '../../toast.js';
 import { openAddArticleModal } from '../../modals/addArticleModal.js';
 import { openQrPairingModal } from '../../modals/qrPairingModal.js';
 import { openShopNameModal } from '../../modals/shopNameModal.js';
+import { openPrinterModal } from '../../modals/printerModal.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -59,6 +60,10 @@ export function renderHeaderHTML(shopName, currentUser) {
             ${renderIcon('qrcode', { size: 15 })} Phone Camera QR
           </button>
 
+          <button type="button" id="btn-printer-setup" class="btn btn-outline btn-sm" title="Configure PIXEL DP82 thermal printer & test cut">
+            ${renderIcon('printer', { size: 15 })} Printer
+          </button>
+
           <button type="button" id="btn-export-csv" class="btn btn-outline btn-sm">
             ${renderIcon('download', { size: 15 })} Export CSV
           </button>
@@ -82,9 +87,12 @@ export function bindHeaderEvents(containerEl, callbacks) {
 
   const btnEditShop = containerEl.querySelector('#btn-edit-shop');
   const btnQr = containerEl.querySelector('#btn-qr-modal');
+  const btnPrinter = containerEl.querySelector('#btn-printer-setup');
   const btnCsv = containerEl.querySelector('#btn-export-csv');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
   const btnLogout = containerEl.querySelector('#btn-logout');
+
+  if (btnPrinter) btnPrinter.addEventListener('click', openPrinterModal);
 
   if (btnEditShop) {
     btnEditShop.addEventListener('click', () => {
@@ -101,9 +109,11 @@ export function bindHeaderEvents(containerEl, callbacks) {
 
   if (btnAdd) {
     btnAdd.addEventListener('click', () => {
+      const brandTitle = containerEl.querySelector('#brand-shop-name');
+      const currentName = brandTitle ? brandTitle.textContent.trim() : 'Mehak Bridal Studio';
       openAddArticleModal((newArt) => {
         if (onArticleAdded) onArticleAdded(newArt);
-      });
+      }, currentName);
     });
   }
 

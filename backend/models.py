@@ -30,8 +30,11 @@ class ArticleUpdate(BaseModel):
     booking_date:     Optional[str]   = None
     return_date:      Optional[str]   = None
     salesman_name:    Optional[str]   = None
+    has_jewellery:    Optional[int]   = None
+    jewellery_details:Optional[str]   = None
+    jewellery_price:  Optional[float] = None
 
-    @field_validator("price", "security_deposit", "advance_amount", "balance_amount", mode="before")
+    @field_validator("price", "security_deposit", "advance_amount", "balance_amount", "jewellery_price", mode="before")
     @classmethod
     def validate_non_negative(cls, v):
         """Ensure monetary values are valid non-negative numbers."""

@@ -11,6 +11,7 @@ import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
 import { compressToMediumResolution } from '../imageUtils.js';
 import { showToast } from '../toast.js';
+import { openWhatsAppBillModal } from './whatsappModal.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -24,8 +25,9 @@ function escapeHtml(str) {
 /**
  * Opens the Add Garment modal for desktop.
  * @param {function} [onCreated] - Callback receiving the newly created article object
+ * @param {string} [shopName] - Store brand title
  */
-export function openAddArticleModal(onCreated) {
+export function openAddArticleModal(onCreated, shopName = 'Mehak Bridal Studio') {
   let photoBlob = null;
   let photoUrl = null;
 
@@ -83,7 +85,7 @@ export function openAddArticleModal(onCreated) {
             <select id="add-category" class="input-field">
               <option value="Bridal">Bridal</option>
               <option value="Reception">Reception</option>
-              <option value="Jewellery">Jewellery</option>
+              <option value="Sherwani">Sherwani</option>
               <option value="Casual">Casual</option>
             </select>
           </div>
@@ -98,7 +100,7 @@ export function openAddArticleModal(onCreated) {
         <!-- Price & Advance -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
-            <label class="input-label" for="add-price">Rental Price (₹) *</label>
+            <label class="input-label" for="add-price">Garment Rental Price (₹) *</label>
             <div class="currency-input-container">
               <span class="currency-symbol-prefix">₹</span>
               <input type="number" id="add-price" min="0" step="100" class="input-field" placeholder="e.g. 45000" required />
@@ -109,6 +111,47 @@ export function openAddArticleModal(onCreated) {
             <div class="currency-input-container">
               <span class="currency-symbol-prefix">₹</span>
               <input type="number" id="add-advance" min="0" step="100" class="input-field" placeholder="0" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Matching Jewellery Add-on Section -->
+        <div class="jewellery-addon-box" id="add-jewel-box">
+          <div class="jewellery-toggle-header" id="add-jewel-toggle-header">
+            <div class="jewellery-header-title">
+              <span class="jewellery-icon-badge">💍</span>
+              <div>
+                <div class="jewellery-title-text">Matching Jewellery Set</div>
+                <div class="jewellery-sub-text">Add paired jewellery with this outfit</div>
+              </div>
+            </div>
+            <label class="switch-control">
+              <input type="checkbox" id="add-toggle-jewel" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="jewellery-body-content" id="add-jewel-body" style="display: none;">
+            <label class="input-label" style="font-size: 0.74rem;">Select Jewellery Set Type</label>
+            <div class="jewel-chips-grid" id="add-jewel-chips">
+              <button type="button" class="jewel-select-chip active" data-val="Full Bridal Set">Full Bridal Set</button>
+              <button type="button" class="jewel-select-chip" data-val="Choker & Necklace">Choker &amp; Necklace</button>
+              <button type="button" class="jewel-select-chip" data-val="Matha Patti & Nath">Matha Patti &amp; Nath</button>
+              <button type="button" class="jewel-select-chip" data-val="Earrings & Tikka">Earrings &amp; Tikka</button>
+              <button type="button" class="jewel-select-chip" data-val="Other / Custom">Other / Custom</button>
+            </div>
+            <div>
+              <input type="text" id="add-jewel-desc" class="input-field" placeholder="Jewellery description / set code..." value="Full Bridal Set" style="font-size: 0.85rem;" />
+            </div>
+            <div>
+              <label class="input-label" for="add-jewel-price" style="font-size: 0.74rem;">Jewellery Rental Extra Price (₹) *</label>
+              <div class="currency-input-container">
+                <span class="currency-symbol-prefix">₹</span>
+                <input type="number" id="add-jewel-price" min="0" step="100" class="input-field" placeholder="e.g. 3000" value="0" />
+              </div>
+              <div style="font-size: 0.72rem; color: #8C6A2A; margin-top: 3px;" id="add-jewel-calc-hint">
+                💡 Automatically added to total rental price.
+              </div>
             </div>
           </div>
         </div>
@@ -179,12 +222,57 @@ export function openAddArticleModal(onCreated) {
   // Sync title field with Collection Category
   const categorySelect = modalEl.querySelector('#add-category');
   const titleInput = modalEl.querySelector('#add-title');
-  const standardCategories = ['Bridal', 'Reception', 'Jewellery', 'Casual'];
+  const standardCategories = ['Bridal', 'Reception', 'Sherwani', 'Casual'];
   categorySelect.addEventListener('change', () => {
     const cur = titleInput.value.trim();
     if (!cur || standardCategories.includes(cur)) {
       titleInput.value = categorySelect.value;
     }
+  });
+
+  // Jewellery Add-on Toggle and Presets
+  const jewelBox = modalEl.querySelector('#add-jewel-box');
+  const jewelToggle = modalEl.querySelector('#add-toggle-jewel');
+  const jewelBody = modalEl.querySelector('#add-jewel-body');
+  const jewelChips = modalEl.querySelectorAll('#add-jewel-chips .jewel-select-chip');
+  const jewelDescInput = modalEl.querySelector('#add-jewel-desc');
+  const jewelPriceInput = modalEl.querySelector('#add-jewel-price');
+  const jewelHeader = modalEl.querySelector('#add-jewel-toggle-header');
+
+  const updateJewelState = () => {
+    if (jewelToggle.checked) {
+      jewelBox.classList.add('active');
+      jewelBody.style.display = 'flex';
+      if (!jewelPriceInput.value || parseFloat(jewelPriceInput.value) === 0) {
+        jewelPriceInput.focus();
+      }
+    } else {
+      jewelBox.classList.remove('active');
+      jewelBody.style.display = 'none';
+    }
+  };
+
+  jewelToggle.addEventListener('change', updateJewelState);
+  jewelHeader.addEventListener('click', (e) => {
+    if (e.target !== jewelToggle && !e.target.closest('.switch-control')) {
+      jewelToggle.checked = !jewelToggle.checked;
+      updateJewelState();
+    }
+  });
+
+  jewelChips.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      jewelChips.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const val = btn.dataset.val;
+      if (val === 'Other / Custom') {
+        jewelDescInput.value = '';
+        jewelDescInput.placeholder = 'Enter jewellery details (e.g. Kundan Set #12)...';
+        jewelDescInput.focus();
+      } else {
+        jewelDescInput.value = val;
+      }
+    });
   });
 
   // Photo dropzone handling
@@ -229,9 +317,14 @@ export function openAddArticleModal(onCreated) {
       return;
     }
 
-    const price = parseFloat(modalEl.querySelector('#add-price').value) || 0;
+    const garmentPrice = parseFloat(modalEl.querySelector('#add-price').value) || 0;
+    const hasJewel = jewelToggle.checked ? 1 : 0;
+    const jewelPrice = hasJewel ? (parseFloat(jewelPriceInput.value) || 0) : 0;
+    const jewelDetails = hasJewel ? (jewelDescInput.value.trim() || 'Full Bridal Set') : '';
+    const totalPrice = garmentPrice + jewelPrice;
+
     const advance = parseFloat(modalEl.querySelector('#add-advance').value) || 0;
-    const balance = Math.max(0, price - advance);
+    const balance = Math.max(0, totalPrice - advance);
     const finalId = idInput.value.trim().toUpperCase() || '0001';
 
     submitBtn.disabled = true;
@@ -244,9 +337,12 @@ export function openAddArticleModal(onCreated) {
     const titleVal = modalEl.querySelector('#add-title').value.trim() || categoryVal;
     formData.append('title', titleVal);
     formData.append('category', categoryVal);
-    formData.append('price', price);
+    formData.append('price', totalPrice);
     formData.append('advance_amount', advance);
     formData.append('balance_amount', balance);
+    formData.append('has_jewellery', hasJewel);
+    formData.append('jewellery_details', jewelDetails);
+    formData.append('jewellery_price', jewelPrice);
     formData.append('customer_name', modalEl.querySelector('#add-customer-name').value.trim());
     formData.append('customer_phone', modalEl.querySelector('#add-customer-phone').value.trim());
     formData.append('pickup_date', modalEl.querySelector('#add-pickup-date').value);
@@ -262,6 +358,12 @@ export function openAddArticleModal(onCreated) {
         if (photoUrl) URL.revokeObjectURL(photoUrl);
         closeModal();
         if (onCreated) onCreated(res.article);
+
+        // Instant post-booking WhatsApp e-bill dispatch prompt
+        const custPhone = (res.article?.customer_phone || '').trim();
+        if (custPhone) {
+          openWhatsAppBillModal(res.article, shopName);
+        }
       } else {
         alert(res.message || 'Failed to add article');
         submitBtn.disabled = false;

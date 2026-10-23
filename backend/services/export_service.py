@@ -44,6 +44,7 @@ def generate_inventory_csv_response() -> StreamingResponse:
         "ID", "Article ID", "Title / Description", "Category",
         "Customer Name", "Customer Phone", "Customer Address", "Pickup Date", "Return Date", "Booking Date",
         "Rental Price (₹)", "Advance (₹)", "Balance (₹)",
+        "Matching Jewellery", "Jewellery Price (₹)",
         "Notes", "Image URL", "Created Date",
     ])
     for r in rows:
@@ -55,6 +56,10 @@ def generate_inventory_csv_response() -> StreamingResponse:
             clean_t = cat_n
         else:
             clean_t = raw_t
+
+        has_j = int(a.get("has_jewellery") or 0) == 1
+        j_details = str(a.get("jewellery_details") or "Yes") if has_j else "No"
+        j_price = a.get("jewellery_price") if has_j else 0
 
         writer.writerow([
             sanitize_csv_cell(a["id"]),
@@ -70,6 +75,8 @@ def generate_inventory_csv_response() -> StreamingResponse:
             sanitize_csv_cell(a.get("price")),
             sanitize_csv_cell(a.get("advance_amount")),
             sanitize_csv_cell(a.get("balance_amount")),
+            sanitize_csv_cell(j_details),
+            sanitize_csv_cell(j_price),
             sanitize_csv_cell(a.get("notes")),
             sanitize_csv_cell(a.get("image_path")),
             sanitize_csv_cell(a.get("created_at")),

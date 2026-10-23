@@ -8,6 +8,7 @@
 
 import { renderIcon } from '../../icons.js';
 import { showToast } from '../../toast.js';
+import { api } from '../../api.js';
 
 /**
  * Initializes the mobile submit and progress overlay controller.
@@ -61,19 +62,48 @@ export function initSubmitOverlay(containerEl, callbacks = {}) {
         if (onDone) onDone();
       };
 
+      const hasPhone = Boolean((article.customer_phone || '').trim().replace(/\D/g, '').length >= 10);
+
       if (overlayActions) {
         overlayActions.style.display = 'flex';
+        overlayActions.style.flexDirection = 'column';
+        overlayActions.style.gap = '8px';
         overlayActions.innerHTML = `
-          <button type="button" id="btn-m-next-booking" class="btn btn-gold" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
+          ${hasPhone ? `
+            <button type="button" id="btn-m-wa-booking" class="btn btn-whatsapp" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
+              ${renderIcon('messageCircle', { size: 18, color: '#FFFFFF' })} Send WhatsApp E-Bill
+            </button>
+          ` : ''}
+          <button type="button" id="btn-m-next-booking" class="${hasPhone ? 'btn btn-outline' : 'btn btn-gold'}" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; ${hasPhone ? '' : 'margin-top: 6px;'}">
             Next Garment
           </button>
         `;
+
+        const btnWa = overlayActions.querySelector('#btn-m-wa-booking');
+        if (btnWa) {
+          btnWa.addEventListener('click', async () => {
+            btnWa.disabled = true;
+            try {
+              const res = await api.sendWhatsAppBill(article.id);
+              if (res && res.whatsapp_url) {
+                window.open(res.whatsapp_url, '_blank');
+              }
+            } catch (e) {
+              const digits = (article.customer_phone || '').replace(/\D/g, '');
+              const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
+              window.open(`https://wa.me/${cleanPhone}`, '_blank');
+            }
+            handleDone();
+          });
+        }
 
         const btnMNext = overlayActions.querySelector('#btn-m-next-booking');
         if (btnMNext) btnMNext.addEventListener('click', handleDone);
       }
 
-      setTimeout(handleDone, 1400);
+      if (!hasPhone) {
+        setTimeout(handleDone, 1400);
+      }
     },
 
     hide() {

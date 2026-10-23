@@ -132,6 +132,128 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Dashboard Summary Metrics (At Top of Search Bar) */
+.dashboard-metrics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.summary-metric-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.summary-metric-card:hover {
+  background: #FFFFFF;
+  border-color: var(--gold-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.summary-metric-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.summary-metric-card:hover .summary-metric-icon {
+  transform: scale(1.06);
+}
+
+.summary-metric-card.metric-card-items .summary-metric-icon {
+  background: rgba(158, 123, 59, 0.1);
+  color: var(--gold);
+  border: 1px solid rgba(158, 123, 59, 0.22);
+}
+
+.summary-metric-card.metric-card-amount .summary-metric-icon {
+  background: var(--accent-noir);
+  color: #FFFFFF;
+  border: 1px solid #27272A;
+}
+
+.summary-metric-card.metric-card-paid .summary-metric-icon {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.summary-metric-card.metric-card-left .summary-metric-icon {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
+}
+
+.summary-metric-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.summary-metric-label {
+  font-size: 0.70rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.summary-metric-val {
+  font-size: 1.22rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.summary-metric-val.text-success {
+  color: var(--success);
+}
+
+.summary-metric-val.text-warning {
+  color: var(--warning);
+}
+
+.summary-metric-sub {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-metrics-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .dashboard-metrics-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
 .search-input-wrap {
   position: relative;
   display: flex;
@@ -621,8 +743,8 @@
 
 .card-actions-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
   margin-top: auto;
   padding-top: 8px;
   align-items: center;
@@ -630,10 +752,10 @@
 
 .card-action-btn {
   height: 33px;
-  padding: 0 6px;
-  font-size: 0.78rem;
+  padding: 0 4px;
+  font-size: 0.74rem;
   font-weight: 600;
-  gap: 5px;
+  gap: 4px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   justify-content: center;
@@ -647,6 +769,18 @@
 
 .card-action-btn:active {
   transform: scale(0.97);
+}
+
+.btn-whatsapp-card {
+  background: #25D366;
+  color: #FFFFFF !important;
+  border: 1px solid #1EBE5D;
+}
+
+.btn-whatsapp-card:hover {
+  background: #1EBE5D;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.3);
 }
 
 /* Empty State */

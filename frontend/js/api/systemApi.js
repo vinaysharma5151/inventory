@@ -178,5 +178,47 @@ export const systemApi = {
       window.removeEventListener('beforeunload', cleanup);
       window.removeEventListener('pagehide', cleanup);
     };
+  },
+
+  /**
+   * Retrieves list of installed OS printers and the active thermal printer.
+   * @returns {Promise<{success: boolean, printers: string[], active_printer: string|null}>}
+   */
+  async getPrinters() {
+    try {
+      const res = await request(`${API_BASE}/system/printers`);
+      if (!res.ok) return { success: false, printers: [], active_printer: null };
+      return res.json();
+    } catch (_) {
+      return { success: false, printers: [], active_printer: null };
+    }
+  },
+
+  /**
+   * Sets preferred thermal printer for direct ESC/POS printing.
+   * @param {string} printerName - Target printer name
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async selectPrinter(printerName) {
+    const res = await request(`${API_BASE}/system/printers/select`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ printer_name: printerName })
+    });
+    return res.json();
+  },
+
+  /**
+   * Prints an 80mm diagnostic ticket with paper feed and cut test.
+   * @param {string} [printerName] - Target printer name (optional)
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async testPrintPrinter(printerName) {
+    const res = await request(`${API_BASE}/system/printers/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ printer_name: printerName || '' })
+    });
+    return res.json();
   }
 };

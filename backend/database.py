@@ -16,24 +16,26 @@ from backend.config import DB_PATH
 
 
 # ---------------------------------------------------------------------------
-# Connection (singleton — module-level, re-used across requests)
-# ponytail: one shared connection, add connection pool if load increases
+# Connection (thread-local — isolated per thread for safe multi-thread concurrency)
 # ---------------------------------------------------------------------------
-_conn: Optional[sqlite3.Connection] = None
+import threading
+
+_local = threading.local()
 
 
 def get_db() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
-        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row  # rows behave like dicts
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _conn.execute("PRAGMA foreign_keys=ON")
-        _conn.execute("PRAGMA synchronous=NORMAL")
-        _conn.execute("PRAGMA cache_size=-64000")
-        _conn.execute("PRAGMA temp_store=MEMORY")
-        _conn.execute("PRAGMA mmap_size=268435456")
-    return _conn
+    conn = getattr(_local, "conn", None)
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30.0)
+        conn.row_factory = sqlite3.Row  # rows behave like dicts
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=-16000")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA busy_timeout=30000")
+        _local.conn = conn
+    return conn
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +91,9 @@ CREATE TABLE IF NOT EXISTS articles (
     booking_date     TEXT,
     return_date      TEXT,
     salesman_name    TEXT,
+    has_jewellery    INTEGER DEFAULT 0,
+    jewellery_details TEXT,
+    jewellery_price  REAL    DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -154,15 +159,18 @@ CREATE TABLE IF NOT EXISTS settings (
 
 # Columns that may be missing in older DB versions
 _MIGRATE_COLUMNS = {
-    "customer_name":    "TEXT",
-    "customer_phone":   "TEXT",
-    "customer_address": "TEXT",
-    "pickup_date":      "TEXT",
-    "booking_date":     "TEXT",
-    "return_date":      "TEXT",
-    "salesman_name":    "TEXT",
-    "advance_amount":   "REAL DEFAULT 0",
-    "balance_amount":   "REAL DEFAULT 0",
+    "customer_name":     "TEXT",
+    "customer_phone":    "TEXT",
+    "customer_address":  "TEXT",
+    "pickup_date":       "TEXT",
+    "booking_date":      "TEXT",
+    "return_date":       "TEXT",
+    "salesman_name":     "TEXT",
+    "advance_amount":    "REAL DEFAULT 0",
+    "balance_amount":    "REAL DEFAULT 0",
+    "has_jewellery":     "INTEGER DEFAULT 0",
+    "jewellery_details": "TEXT",
+    "jewellery_price":   "REAL DEFAULT 0",
 }
 
 

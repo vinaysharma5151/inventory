@@ -14,6 +14,7 @@ import { printThermalBill, printGarmentTag } from '../tag.js?v=9';
 import { showToast } from '../toast.js';
 import { openClearoutModal } from './clearoutModal.js';
 import { openEditArticleModal } from './editArticleModal.js?v=8';
+import { openWhatsAppBillModal } from './whatsappModal.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -79,6 +80,7 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     : Math.max(0, numPrice - numAdvance);
 
   const isFullyPaid = numPrice > 0 && numBalance === 0;
+  const hasJewel = Number(article.has_jewellery || 0) === 1;
 
   const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
     ? article.title
@@ -120,10 +122,28 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
           <div>
             <div class="detail-tags-row">
               <span class="badge badge-gold">${escapeHtml(article.category || 'Bridal')}</span>
+              ${hasJewel ? `
+                <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.4); font-weight: 600;">
+                  💍 Matching Jewellery
+                </span>
+              ` : ''}
             </div>
             <h2 class="detail-main-title">
               ${escapeHtml(displayTitle)}
             </h2>
+
+            ${hasJewel ? `
+              <div style="margin: 10px 0 14px; padding: 10px 14px; background: #FFFDF5; border: 1px solid #E6D5A8; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <span style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #8C6A2A; font-weight: 700; display: block;">Paired Jewellery Set</span>
+                  <span style="font-size: 0.92rem; font-weight: 600; color: #1e1e1e;">💍 ${escapeHtml(article.jewellery_details || 'Full Set')}</span>
+                </div>
+                <div style="text-align: right;">
+                  <span style="font-size: 0.72rem; color: #777; display: block;">Jewellery Price</span>
+                  <span style="font-size: 0.92rem; font-weight: 700; color: #8C6A2A; font-family: monospace;">+₹${formatINR(article.jewellery_price || 0)}</span>
+                </div>
+              </div>
+            ` : ''}
           </div>
 
           <!-- Payment Breakdown -->
@@ -308,17 +328,11 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
     }
   });
 
-  // WhatsApp bill trigger (Direct WhatsApp click-to-chat via wa.me)
+  // WhatsApp bill trigger: Open WhatsApp E-Bill Dispatcher
   const waBtn = modalEl.querySelector('.btn-send-wa');
   if (waBtn) {
     waBtn.addEventListener('click', () => {
-      const directUrl = getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalance);
-      if (directUrl) {
-        window.open(directUrl, '_blank');
-        showToast('Opening WhatsApp with e-bill...', 'neutral');
-      } else {
-        showToast('No customer phone number found on this garment.', 'warning');
-      }
+      openWhatsAppBillModal(article, shopName);
     });
   }
 

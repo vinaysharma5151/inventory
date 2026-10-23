@@ -43,6 +43,10 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     ? Number(article.balance_amount)
     : Math.max(0, numPrice - numAdvance);
 
+  const hasJewel = Number(article.has_jewellery || 0) === 1;
+  const initialJewelDetails = article.jewellery_details || 'Full Bridal Set';
+  const initialJewelPrice = Number(article.jewellery_price) || 0;
+
   const cleanTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
     ? article.title
     : (article.category || 'Bridal');
@@ -118,7 +122,7 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
             <select id="edit-category" class="input-field">
               <option value="Bridal" ${article.category === 'Bridal' ? 'selected' : ''}>Bridal</option>
               <option value="Reception" ${article.category === 'Reception' ? 'selected' : ''}>Reception</option>
-              <option value="Jewellery" ${article.category === 'Jewellery' ? 'selected' : ''}>Jewellery</option>
+              <option value="Sherwani" ${article.category === 'Sherwani' ? 'selected' : ''}>Sherwani</option>
               <option value="Casual" ${article.category === 'Casual' ? 'selected' : ''}>Casual</option>
             </select>
           </div>
@@ -197,6 +201,44 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
             <span id="edit-calc-balance-text" class="font-mono" style="font-weight: 700; color: ${initialBalance <= 0 ? '#15803D' : '#D97706'};">
               ₹${formatINR(initialBalance)}
             </span>
+          </div>
+        </div>
+
+        <!-- Matching Jewellery Add-on Section -->
+        <div class="jewellery-addon-box ${hasJewel ? 'active' : ''}" id="edit-jewel-box">
+          <div class="jewellery-toggle-header" id="edit-jewel-toggle-header">
+            <div class="jewellery-header-title">
+              <span class="jewellery-icon-badge">💍</span>
+              <div>
+                <div class="jewellery-title-text">Matching Jewellery Set</div>
+                <div class="jewellery-sub-text">Paired jewellery taken with this outfit</div>
+              </div>
+            </div>
+            <label class="switch-control">
+              <input type="checkbox" id="edit-toggle-jewel" ${hasJewel ? 'checked' : ''} />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="jewellery-body-content" id="edit-jewel-body" style="display: ${hasJewel ? 'flex' : 'none'};">
+            <label class="input-label" style="font-size: 0.74rem;">Select Jewellery Set Type</label>
+            <div class="jewel-chips-grid" id="edit-jewel-chips">
+              <button type="button" class="jewel-select-chip ${initialJewelDetails === 'Full Bridal Set' ? 'active' : ''}" data-val="Full Bridal Set">Full Bridal Set</button>
+              <button type="button" class="jewel-select-chip ${initialJewelDetails.includes('Choker') ? 'active' : ''}" data-val="Choker & Necklace">Choker &amp; Necklace</button>
+              <button type="button" class="jewel-select-chip ${initialJewelDetails.includes('Matha Patti') ? 'active' : ''}" data-val="Matha Patti & Nath">Matha Patti &amp; Nath</button>
+              <button type="button" class="jewel-select-chip ${initialJewelDetails.includes('Earrings') ? 'active' : ''}" data-val="Earrings & Tikka">Earrings &amp; Tikka</button>
+              <button type="button" class="jewel-select-chip" data-val="Other / Custom">Other / Custom</button>
+            </div>
+            <div>
+              <input type="text" id="edit-jewel-desc" class="input-field" placeholder="Jewellery description / set code..." value="${escapeHtml(initialJewelDetails)}" style="font-size: 0.85rem;" />
+            </div>
+            <div>
+              <label class="input-label" for="edit-jewel-price" style="font-size: 0.74rem;">Jewellery Rental Extra Price (₹)</label>
+              <div class="currency-input-container">
+                <span class="currency-symbol-prefix">₹</span>
+                <input type="number" id="edit-jewel-price" min="0" step="100" class="input-field" placeholder="e.g. 3000" value="${initialJewelPrice}" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -366,10 +408,52 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     btnChangePhoto.innerHTML = `${renderIcon('upload', { size: 14 })} Choose Replacement Photo`;
   });
 
+  // Jewellery Add-on Toggle and Presets
+  const jewelBox = modalEl.querySelector('#edit-jewel-box');
+  const jewelToggle = modalEl.querySelector('#edit-toggle-jewel');
+  const jewelBody = modalEl.querySelector('#edit-jewel-body');
+  const jewelChips = modalEl.querySelectorAll('#edit-jewel-chips .jewel-select-chip');
+  const jewelDescInput = modalEl.querySelector('#edit-jewel-desc');
+  const jewelPriceInput = modalEl.querySelector('#edit-jewel-price');
+  const jewelHeader = modalEl.querySelector('#edit-jewel-toggle-header');
+
+  const updateJewelState = () => {
+    if (jewelToggle.checked) {
+      jewelBox.classList.add('active');
+      jewelBody.style.display = 'flex';
+    } else {
+      jewelBox.classList.remove('active');
+      jewelBody.style.display = 'none';
+    }
+  };
+
+  jewelToggle.addEventListener('change', updateJewelState);
+  jewelHeader.addEventListener('click', (e) => {
+    if (e.target !== jewelToggle && !e.target.closest('.switch-control')) {
+      jewelToggle.checked = !jewelToggle.checked;
+      updateJewelState();
+    }
+  });
+
+  jewelChips.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      jewelChips.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const val = btn.dataset.val;
+      if (val === 'Other / Custom') {
+        jewelDescInput.value = '';
+        jewelDescInput.placeholder = 'Enter jewellery details (e.g. Polki Set #3)...';
+        jewelDescInput.focus();
+      } else {
+        jewelDescInput.value = val;
+      }
+    });
+  });
+
   // Sync title field with Collection Category
   const editCatSelect = modalEl.querySelector('#edit-category');
   const editTitleInput = modalEl.querySelector('#edit-title');
-  const standardCategories = ['Bridal', 'Reception', 'Jewellery', 'Casual'];
+  const standardCategories = ['Bridal', 'Reception', 'Sherwani', 'Casual'];
   editCatSelect.addEventListener('change', () => {
     const cur = editTitleInput.value.trim();
     if (!cur || standardCategories.includes(cur)) {
@@ -401,6 +485,10 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
     const editCategoryVal = modalEl.querySelector('#edit-category').value;
     const editTitleVal = modalEl.querySelector('#edit-title').value.trim() || editCategoryVal;
 
+    const hasJewelVal = jewelToggle.checked ? 1 : 0;
+    const jewelDetailsVal = hasJewelVal ? (jewelDescInput.value.trim() || 'Full Bridal Set') : '';
+    const jewelPriceVal = hasJewelVal ? (parseFloat(jewelPriceInput.value) || 0) : 0;
+
     const payload = {
       article_id: updatedId,
       title: editTitleVal,
@@ -409,6 +497,9 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
       advance_amount: advance,
       security_deposit: deposit,
       balance_amount: balance,
+      has_jewellery: hasJewelVal,
+      jewellery_details: jewelDetailsVal,
+      jewellery_price: jewelPriceVal,
       customer_name: modalEl.querySelector('#edit-cust-name').value.trim(),
       customer_phone: modalEl.querySelector('#edit-cust-phone').value.trim(),
       customer_address: modalEl.querySelector('#edit-cust-addr').value.trim(),

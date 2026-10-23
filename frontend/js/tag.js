@@ -13,6 +13,7 @@
  */
 
 import { showToast } from './toast.js';
+import { api } from './api.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -318,7 +319,8 @@ function getThermalStyles() {
       font-weight: 700;
     }
     .receipt-bottom-feed {
-      height: 12mm;
+      height: 35mm;
+      min-height: 35mm;
     }
   `;
 }
@@ -401,6 +403,12 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
           <span class="receipt-label">COLLECTION:</span>
           <span class="receipt-val">${escapeHtml(article.category || 'Bridal')}</span>
         </div>
+        ${article.has_jewellery ? `
+          <div class="receipt-row">
+            <span class="receipt-label">JEWELLERY:</span>
+            <span class="receipt-val bold">💍 ${escapeHtml(article.jewellery_details || 'Full Set')} (+₹${formatINR(article.jewellery_price || 0)})</span>
+          </div>
+        ` : ''}
 
         <div class="receipt-dates-box">
           ${article.booking_date ? `
@@ -425,6 +433,16 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
       <!-- Payment Breakdown -->
       <div class="receipt-section">
         <div class="receipt-section-title">[ PAYMENT SUMMARY ]</div>
+        ${(article.has_jewellery && Number(article.jewellery_price) > 0) ? `
+          <div class="receipt-row" style="font-size: 11px; color: #333;">
+            <span class="receipt-label">Outfit Rent:</span>
+            <span class="receipt-val">₹${formatINR(Math.max(0, numPrice - Number(article.jewellery_price)))}</span>
+          </div>
+          <div class="receipt-row" style="font-size: 11px; color: #333;">
+            <span class="receipt-label">Jewellery Rent:</span>
+            <span class="receipt-val">+ ₹${formatINR(article.jewellery_price)}</span>
+          </div>
+        ` : ''}
         <div class="receipt-row">
           <span class="receipt-label">Total Rental Price:</span>
           <span class="receipt-val bold">₹${formatINR(numPrice)}</span>
@@ -489,21 +507,37 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
         <div class="receipt-cut-line">- - - - - - - - - - - - - - - - - - - - - -</div>
       </div>
 
-      <!-- Bottom blank feed margin for thermal paper tear bar/cutter -->
-      <div class="receipt-bottom-feed"></div>
+      <!-- Bottom blank feed margin for thermal paper tear bar/cutter (35mm clearance) -->
+      <div class="receipt-bottom-feed" style="height: 35mm; min-height: 35mm; line-height: 35mm;">&nbsp;</div>
     </div>
   `;
 }
 
 /**
  * Prepares the receipt and directly sends the print request to the thermal printer.
+ * Tries direct 1-click ESC/POS silent print via Windows Spooler first.
+ * If printer is offline, seamlessly falls back to browser print with 35mm clearance.
  * @param {object} article - Article data model
  * @param {string} [shopName='MEHAK BRIDAL STUDIO'] - Boutique name
  */
-export function printThermalBill(article, shopName = '') {
+export async function printThermalBill(article, shopName = '') {
   if (!article) return;
 
   const storeBrand = (shopName && shopName.trim()) ? shopName.trim().toUpperCase() : 'MEHAK BRIDAL STUDIO';
+
+  // 1. Direct 1-Click Silent Print via ESC/POS Spooler (zero popup dialogs)
+  try {
+    showToast(`Sending Bill #${article.article_id || '0001'} to thermal printer...`, 'neutral', 2000);
+    const res = await api.printThermalDirect(article.id);
+    if (res && res.success) {
+      showToast(`✓ Bill #${article.article_id || '0001'} printed directly to ${res.printer || 'PIXEL DP82'}!`, 'success', 3500);
+      return;
+    }
+  } catch (err) {
+    console.info('Direct spooler print unavailable, opening browser print dialog:', err?.message || err);
+  }
+
+  // 2. Fallback: Browser zero-margin iframe print (with 35mm bottom cutter feed clearance)
   const receiptHtml = generateThermalReceiptHtml(article, storeBrand);
   const thermalCss = getThermalStyles();
 

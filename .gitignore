@@ -43,3 +43,7 @@ backups/*
 
 logs/*
 !logs/.gitkeep
+
+# Legacy WhatsApp session cache
+whatsapp_session/
+

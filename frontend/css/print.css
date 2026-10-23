@@ -266,7 +266,9 @@
 }
 
 .receipt-bottom-feed {
-  height: 12mm;
+  height: 35mm;
+  min-height: 35mm;
+  line-height: 35mm;
 }
 
 /* Spinner helper */

@@ -12,8 +12,10 @@ import { renderIcon } from '../icons.js';
 import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
 import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=9';
-import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=8';
-import { createArticleCard } from './desktop/articleCard.js?v=10';
+import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=9';
+import { createArticleCard } from './desktop/articleCard.js?v=12';
+
+const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];
@@ -25,6 +27,7 @@ export function createDesktopDashboard(containerEl, state) {
     searchQuery: '',
     selectedCategory: 'all',
     paymentFilter: 'all',
+    jewelleryFilter: 'all',
     dateField: 'pickup_date',
     datePreset: 'all',
     filterMonth: '',
@@ -41,6 +44,49 @@ export function createDesktopDashboard(containerEl, state) {
       <main class="dashboard-main-content">
         <!-- Search & Filter Card -->
         <section class="search-filter-card">
+          <!-- Summary Metrics Strip (At Top of Search Bar) -->
+          <div class="dashboard-metrics-summary" id="dashboard-metrics-summary">
+            <div class="summary-metric-card metric-card-items" title="Total pieces currently matching active filters">
+              <div class="summary-metric-icon">
+                ${renderIcon('layers', { size: 18, color: 'var(--gold)' })}
+              </div>
+              <div class="summary-metric-info">
+                <span class="summary-metric-label">Total Items</span>
+                <span class="summary-metric-val font-mono" id="metric-total-items">0</span>
+              </div>
+            </div>
+
+            <div class="summary-metric-card metric-card-amount" title="Total booking value of items shown below">
+              <div class="summary-metric-icon">
+                ${renderIcon('indianRupee', { size: 18, color: '#FFFFFF' })}
+              </div>
+              <div class="summary-metric-info">
+                <span class="summary-metric-label">Total Amount</span>
+                <span class="summary-metric-val font-mono" id="metric-total-amount">₹0</span>
+              </div>
+            </div>
+
+            <div class="summary-metric-card metric-card-paid" title="Total advance and payments collected for items shown below">
+              <div class="summary-metric-icon">
+                ${renderIcon('checkCircle', { size: 18, color: 'var(--success)' })}
+              </div>
+              <div class="summary-metric-info">
+                <span class="summary-metric-label">Payment Done</span>
+                <span class="summary-metric-val font-mono text-success" id="metric-payment-done">₹0</span>
+              </div>
+            </div>
+
+            <div class="summary-metric-card metric-card-left" title="Pending balance dues for items shown below">
+              <div class="summary-metric-icon">
+                ${renderIcon('clock', { size: 18, color: 'var(--warning)' })}
+              </div>
+              <div class="summary-metric-info">
+                <span class="summary-metric-label">Payment Left</span>
+                <span class="summary-metric-val font-mono text-warning" id="metric-payment-left">₹0</span>
+              </div>
+            </div>
+          </div>
+
           <div class="search-input-wrap">
             <div class="search-icon">${renderIcon('search', { size: 18, color: 'var(--text-muted)' })}</div>
             <input
@@ -57,7 +103,7 @@ export function createDesktopDashboard(containerEl, state) {
               <button type="button" class="filter-chip active" data-cat="all">All Pieces</button>
               <button type="button" class="filter-chip" data-cat="Bridal">Bridal</button>
               <button type="button" class="filter-chip" data-cat="Reception">Reception</button>
-              <button type="button" class="filter-chip" data-cat="Jewellery">Jewellery</button>
+              <button type="button" class="filter-chip" data-cat="Sherwani">Sherwani</button>
               <button type="button" class="filter-chip" data-cat="Casual">Casual</button>
             </div>
 
@@ -66,6 +112,11 @@ export function createDesktopDashboard(containerEl, state) {
               <button type="button" class="filter-chip active" data-pay="all">All</button>
               <button type="button" class="filter-chip" data-pay="due">Balance Due</button>
               <button type="button" class="filter-chip" data-pay="paid">Fully Paid</button>
+            </div>
+
+            <div class="chips-group" id="jewellery-chips-container">
+              <span class="chips-label">Add-ons:</span>
+              <button type="button" class="filter-chip" id="chip-filter-jewellery">💍 With Jewellery</button>
             </div>
           </div>
 
@@ -183,9 +234,42 @@ export function createDesktopDashboard(containerEl, state) {
     }
   };
 
+  // Live Metrics Calculator for visible/filtered items
+  const updateMetrics = (filteredList) => {
+    let totalItems = filteredList.length;
+    let totalAmount = 0;
+    let paymentDone = 0;
+    let paymentLeft = 0;
+
+    for (let i = 0; i < filteredList.length; i++) {
+      const item = filteredList[i];
+      const price = Number(item.price) || 0;
+      const advance = Number(item.advance_amount) || 0;
+      const balance = (item.balance_amount !== undefined && item.balance_amount !== null)
+        ? Math.max(0, Number(item.balance_amount))
+        : Math.max(0, price - advance);
+      const done = (advance > 0) ? advance : Math.max(0, price - balance);
+
+      totalAmount += price;
+      paymentDone += done;
+      paymentLeft += balance;
+    }
+
+    const elItems = containerEl.querySelector('#metric-total-items');
+    const elAmount = containerEl.querySelector('#metric-total-amount');
+    const elDone = containerEl.querySelector('#metric-payment-done');
+    const elLeft = containerEl.querySelector('#metric-payment-left');
+
+    if (elItems) elItems.textContent = totalItems.toLocaleString('en-IN');
+    if (elAmount) elAmount.textContent = `₹${formatINR(totalAmount)}`;
+    if (elDone) elDone.textContent = `₹${formatINR(paymentDone)}`;
+    if (elLeft) elLeft.textContent = `₹${formatINR(paymentLeft)}`;
+  };
+
   // Render Grid
   const renderGrid = () => {
     const filteredList = filterArticles(articles, filterState);
+    updateMetrics(filteredList);
 
     if (filteredList.length === 0) {
       gridContainer.className = '';
@@ -269,6 +353,13 @@ export function createDesktopDashboard(containerEl, state) {
     });
   });
 
+  const jewelChip = containerEl.querySelector('#chip-filter-jewellery');
+  jewelChip?.addEventListener('click', () => {
+    const isActive = jewelChip.classList.toggle('active');
+    filterState.jewelleryFilter = isActive ? 'only' : 'all';
+    renderGrid();
+  });
+
   dateFieldSelect.addEventListener('change', (e) => {
     filterState.dateField = e.target.value;
     renderGrid();
@@ -317,19 +408,6 @@ export function createDesktopDashboard(containerEl, state) {
     // Force reflow
     void cardEl.offsetWidth;
     cardEl.classList.add('just-arrived');
-
-    const tagContainer = cardEl.querySelector('.card-top-tags');
-    if (tagContainer && !tagContainer.querySelector('.badge-live-in')) {
-      const livePill = document.createElement('span');
-      livePill.className = 'badge badge-live-in font-mono';
-      livePill.textContent = '⚡ LIVE JUST IN';
-      tagContainer.prepend(livePill);
-      setTimeout(() => {
-        livePill.style.transition = 'opacity 0.6s ease';
-        livePill.style.opacity = '0';
-        setTimeout(() => livePill.remove(), 600);
-      }, 9000);
-    }
 
     cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };

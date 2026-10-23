@@ -141,5 +141,24 @@ export const articlesApi = {
       throw new Error(err.detail || 'Failed to delete article');
     }
     return res.json();
+  },
+
+  /**
+   * Sends raw ESC/POS bill directly to Windows Print Spooler (PIXEL DP82).
+   * @param {number|string} id - Article database ID
+   * @param {string} [printerName] - Optional target printer name override
+   * @returns {Promise<{success: boolean, printer: string, message: string}>}
+   */
+  async printThermalDirect(id, printerName = '') {
+    const res = await request(`${API_BASE}/articles/${id}/print-thermal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ printer_name: printerName || '' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || 'Direct thermal print failed');
+    }
+    return data;
   }
 };

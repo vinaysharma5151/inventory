@@ -1,16 +1,18 @@
 @echo off
 setlocal
 
-:: If standalone exe exists, launch it directly
+:: If standalone exe exists, launch it directly in this window
 if exist "dist\LehengaBooking.exe" (
     echo Starting Lehenga Booking System (Standalone)...
-    start "" "dist\LehengaBooking.exe"
+    "dist\LehengaBooking.exe"
+    pause
     exit /b 0
 )
 
 if exist "LehengaBooking.exe" (
     echo Starting Lehenga Booking System (Standalone)...
-    start "" "LehengaBooking.exe"
+    "LehengaBooking.exe"
+    pause
     exit /b 0
 )
 

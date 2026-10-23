@@ -65,13 +65,13 @@ def get_whatsapp_config() -> Dict[str, Any]:
 
 
 def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None) -> str:
-    """Generate a clean formatted luxury e-bill message without emojis or corrupt unicode symbols."""
+    """Generate a clean, aesthetic luxury formatted e-bill message."""
     store_name = shop_name or get_shop_name()
-    customer_name = article.get("customer_name") or "Valued Customer"
-    art_id = str(article.get("article_id") or "N/A")
+    customer_name = (article.get("customer_name") or "Valued Customer").strip()
+    art_id = str(article.get("article_id") or "N/A").strip()
     raw_title = str(article.get("title") or "").strip()
     category = str(article.get("category") or "Bridal").replace("–", "-").replace("—", "-")
-    cust_clean = str(article.get("customer_name") or "").strip()
+    cust_clean = customer_name
     if (
         not raw_title
         or raw_title.startswith("Booking –")
@@ -85,37 +85,53 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
     item_display = title if title.lower() == category.lower() else f"{title} ({category})"
     pickup_date = article.get("pickup_date") or "N/A"
     return_date = article.get("return_date") or "N/A"
+    created_date = (str(article.get("created_at") or "")[:10]) or pickup_date
+    phone = article.get("customer_phone") or ""
 
     price = float(article.get("price") or 0)
     advance = float(article.get("advance_amount") or 0)
     security = float(article.get("security_deposit") or 0)
-    balance = float(article.get("balance_amount") or 0)
+    balance = float(
+        article.get("balance_amount")
+        if article.get("balance_amount") is not None
+        else max(0.0, price - advance)
+    )
+
+    has_j = int(article.get("has_jewellery") or 0) == 1
+    jewel_line = ""
+    if has_j:
+        j_det = (article.get("jewellery_details") or "Full Matching Set").strip() or "Full Matching Set"
+        j_pr = float(article.get("jewellery_price") or 0)
+        jewel_extra = f" (+Rs. {j_pr:,.0f})" if j_pr > 0 else ""
+        jewel_line = f"💍 *Jewellery:* {j_det}{jewel_extra}\n"
 
     balance_line = (
-        "*Balance Due:* Rs. 0 (Paid in Full)"
+        "✅ *Balance Due:* Rs. 0 (Paid in Full)"
         if balance <= 0
-        else f"*Balance Due:* Rs. {balance:,.0f}"
+        else f"⏳ *Balance Due:* Rs. {balance:,.0f}"
     )
-    security_line = f"*Security Deposit:* Rs. {security:,.0f}\n" if security > 0 else ""
+    security_line = f"🛡 *Security Deposit:* Rs. {security:,.0f}\n" if security > 0 else ""
 
     text = (
+        f"🧾 *E-BILL & BOOKING CONFIRMATION*\n"
         f"*{store_name.upper()}*\n"
-        f"*Booking Confirmation & E-Bill*\n"
-        f"----------------------------------------\n"
-        f"Dear *{customer_name}*,\n"
-        f"Thank you for choosing {store_name}! Here is your booking summary:\n\n"
-        f"*Article Code:* {art_id}\n"
-        f"*Item:* {item_display}\n"
-        f"*Pickup Date:* {pickup_date}\n"
-        f"*Return Date:* {return_date}\n\n"
-        f"*Total Rent:* Rs. {price:,.0f}\n"
-        f"*Advance Paid:* Rs. {advance:,.0f}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *Customer:* {customer_name}\n"
+        f"📱 *Mobile:* {phone}\n"
+        f"🗓 *Booking ID:* #{art_id} | *Date:* {created_date}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"👗 *Outfit:* {item_display}\n"
+        f"{jewel_line}"
+        f"📅 *Pickup Date:* {pickup_date}\n"
+        f"🔄 *Return Date:* {return_date}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 *Total Rent:* Rs. {price:,.0f}\n"
+        f"💵 *Advance Paid:* Rs. {advance:,.0f}\n"
         f"{security_line}"
-        f"{balance_line}\n\n"
-        f"----------------------------------------\n"
-        f"*{store_name}*\n"
-        f"Kindly present this e-receipt or Article Code during garment pickup.\n"
-        f"Have queries or alteration requests? Reply directly to this WhatsApp number!"
+        f"{balance_line}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🙏 _Thank you for choosing {store_name}!_\n"
+        f"📍 _Kindly present this e-receipt or Booking #{art_id} at pickup._"
     )
     return text
 
@@ -129,6 +145,15 @@ def get_whatsapp_url(phone_raw: Optional[str], text: str) -> Optional[str]:
     return f"https://wa.me/{clean_phone}?text={encoded_text}"
 
 
+def get_whatsapp_app_url(phone_raw: Optional[str], text: str) -> Optional[str]:
+    """Build a native Windows WhatsApp Desktop URI (whatsapp://send)."""
+    clean_phone = format_phone_number(phone_raw)
+    if not clean_phone:
+        return None
+    encoded_text = urllib.parse.quote(text)
+    return f"whatsapp://send?phone={clean_phone}&text={encoded_text}"
+
+
 async def send_booking_ebill_task(article: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Background hook stub for backwards compatibility.
@@ -136,3 +161,4 @@ async def send_booking_ebill_task(article: Dict[str, Any]) -> Tuple[bool, str]:
     """
     logger.info(f"[WHATSAPP] Direct WhatsApp mode active for article {article.get('article_id')}")
     return True, "Direct WhatsApp mode active"
+
