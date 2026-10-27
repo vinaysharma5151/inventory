@@ -117,7 +117,7 @@ export async function openUpdateModal(initialData = null) {
   }
 
   function renderUpdateResult(data) {
-    const currentVer = data.current_version || '2.2.0';
+    const currentVer = data.current_version || '2.2.1';
     const latestVer = data.latest_version || currentVer;
     const isNewer = data.update_available && data.download_url;
 

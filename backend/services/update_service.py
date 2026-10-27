@@ -33,7 +33,7 @@ logger = logging.getLogger("lehenga_backend")
 
 # Target GitHub repository details
 GITHUB_OWNER = "vinaysharma5151"
-GITHUB_REPO = "inventory"
+GITHUB_REPO = "rental_releases"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 EXE_NAME = "LehengaBooking.exe"
 
@@ -84,11 +84,11 @@ def check_github_for_updates() -> Dict[str, Any]:
                 }
             payload = json.loads(resp.read().decode("utf-8"))
 
-        tag_name = payload.get("tag_name", "").strip()
-        release_notes = payload.get("body", "").strip()
-        html_url = payload.get("html_url", "")
-        published_at = payload.get("published_at", "")
-        assets = payload.get("assets", [])
+        tag_name = (payload.get("tag_name") or "").strip()
+        release_notes = (payload.get("body") or "").strip()
+        html_url = payload.get("html_url") or ""
+        published_at = payload.get("published_at") or ""
+        assets = payload.get("assets") or []
 
         # Locate the executable binary in release assets
         download_url: Optional[str] = None
