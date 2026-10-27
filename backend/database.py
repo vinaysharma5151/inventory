@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS articles (
     has_jewellery    INTEGER DEFAULT 0,
     jewellery_details TEXT,
     jewellery_price  REAL    DEFAULT 0,
+    pickup_reminder_sent INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -173,6 +174,7 @@ _MIGRATE_COLUMNS = {
     "has_jewellery":     "INTEGER DEFAULT 0",
     "jewellery_details": "TEXT",
     "jewellery_price":   "REAL DEFAULT 0",
+    "pickup_reminder_sent": "INTEGER DEFAULT 0",
 }
 
 
@@ -215,15 +217,9 @@ def init_db() -> None:
 
     db.commit()
 
-    # Ensure default shop_name is set to Mehak Bridal Studio
-    db.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('shop_name', 'Mehak Bridal Studio')"
-    )
-
-    # Ensure first-time setup is marked as completed
-    db.execute(
-        "INSERT OR IGNORE INTO settings (key, value) VALUES ('first_time_setup_completed', 'true')"
-    )
+    # NOTE: shop_name and first_time_setup_completed are intentionally NOT pre-seeded here.
+    # They are only written after the user completes the first-run setup wizard.
+    # This allows the frontend to detect a fresh install and show the setup screen.
 
     # Prune expired sessions on startup
     db.execute("DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP")

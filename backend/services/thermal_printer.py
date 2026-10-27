@@ -78,12 +78,12 @@ def format_display_date(date_val) -> str:
 # ---------------------------------------------------------------------------
 # ESC/POS Receipt Builder
 # ---------------------------------------------------------------------------
-def build_escpos_bill(article: dict, shop_name: str = "MEHAK BRIDAL STUDIO") -> bytes:
+def build_escpos_bill(article: dict, shop_name: str = "BRIDAL STUDIO") -> bytes:
     """
     Constructs a pure ESC/POS byte sequence tailored for 80mm printers (PIXEL DP82).
     Includes barcode, bold highlights, financial breakdown, and bottom feed with cut.
     """
-    brand = (shop_name or "MEHAK BRIDAL STUDIO").strip().upper()
+    brand = (shop_name or "BRIDAL STUDIO").strip().upper()
     art_id = str(article.get("article_id") or "0001").upper()
     now = datetime.datetime.now()
     date_str = now.strftime("%d %b %Y")

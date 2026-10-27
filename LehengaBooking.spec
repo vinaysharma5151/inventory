@@ -56,8 +56,10 @@ hiddenimports = [
     "backend.services.backup_service",
     "backend.services.export_service",
     "backend.services.image_service",
+    "backend.services.licensing",
     "backend.services.qr_service",
     "backend.services.thermal_printer",
+    "backend.services.update_service",
     "backend.services.whatsapp",
     "logging.handlers",
 ]

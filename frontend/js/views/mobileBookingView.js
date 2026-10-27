@@ -30,7 +30,8 @@ const getISODate = (offsetDays = 0) => {
 };
 
 export function createMobileBookingView(containerEl, state) {
-  let shopName = state.shopName || 'Mehak Bridal Studio';
+  let shopName = state.shopName || 'Bridal Studio';
+  let logoUrl = state.logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
   let category = 'Bridal';
   let pickupDate = getISODate(2);
   let returnDate = getISODate(5);
@@ -46,7 +47,7 @@ export function createMobileBookingView(containerEl, state) {
         <header class="mobile-top-bar">
           <div class="mobile-brand-group">
             <div class="mobile-brand-icon" title="${escapeHtml(shopName)}">
-              <img src="/assets/logo.png" alt="${escapeHtml(shopName)}" class="mobile-brand-logo-img" />
+              <img src="${logoUrl}" alt="${escapeHtml(shopName)}" class="mobile-brand-logo-img" onerror="this.src='/assets/logo.png'" />
             </div>
             <div>
               <span class="mobile-brand-name font-serif">${escapeHtml(shopName)}</span>
@@ -546,6 +547,15 @@ export function createMobileBookingView(containerEl, state) {
         shopName = newName;
         const brandEl = containerEl.querySelector('.mobile-brand-name');
         if (brandEl) brandEl.textContent = newName;
+        const brandIcon = containerEl.querySelector('.mobile-brand-icon');
+        if (brandIcon) brandIcon.title = newName;
+      }
+    },
+    updateLogoUrl(newLogo) {
+      if (newLogo) {
+        logoUrl = newLogo;
+        const logoImg = containerEl.querySelector('.mobile-brand-logo-img');
+        if (logoImg) logoImg.src = newLogo;
       }
     }
   };

@@ -643,7 +643,7 @@ def print_article_direct_thermal(
 
     db = get_db()
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Mehak Bridal Studio"
+    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
 
     target_printer = None
     if payload and payload.get("printer_name"):

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import FRONTEND_DIR, LOGS_DIR, UPLOADS_DIR
+from backend.config import APP_VERSION, FRONTEND_DIR, LOGS_DIR, UPLOADS_DIR
 from backend.database import init_db
 from backend.routes import articles, auth, salesmen, system, whatsapp
 
@@ -50,6 +50,13 @@ if not logger.handlers:
 async def lifespan(app: FastAPI):
     logger.info("Initializing database and application services...")
     init_db()
+    try:
+        from backend.services.whatsapp import dispatch_due_pickup_reminders
+        res = dispatch_due_pickup_reminders()
+        if res.get("sent_count", 0) > 0:
+            logger.info(f"[WHATSAPP] Sent {res['sent_count']} pickup reminder(s) on startup.")
+    except Exception as e:
+        logger.warning(f"[WHATSAPP] Startup reminder check notice: {e}")
     logger.info("Application ready.")
     yield
 
@@ -58,8 +65,8 @@ async def lifespan(app: FastAPI):
 # FastAPI App
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Mehak Bridal Studio — Lehenga Booking API",
-    version="2.1.0",
+    title="Bridal Studio — Lehenga Booking API",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url=None,   # Hardened: disable OpenAPI docs in production
     redoc_url=None,  # Hardened: disable ReDoc in production

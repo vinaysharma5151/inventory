@@ -11,15 +11,16 @@
 
 import { api } from './api.js?v=11';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js?v=14';
-import { createMobileBookingView } from './views/mobileBookingView.js?v=14';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=15';
+import { createMobileBookingView } from './views/mobileBookingView.js?v=15';
 import { openLoginModal } from './modals/loginModal.js';
 
 class App {
   constructor() {
     this.rootEl = document.getElementById('app-root');
     this.articles = [];
-    this.shopName = 'Mehak Bridal Studio';
+    this.shopName = localStorage.getItem('app_shop_name') || '';
+    this.logoUrl = localStorage.getItem('app_logo_url') || '/assets/logo.png';
     this.currentUser = null;
     this.activeViewController = null;
     this.viewMode = this.detectViewMode();
@@ -56,6 +57,9 @@ class App {
           if (this.activeViewController?.updateShopName) {
             this.activeViewController.updateShopName(this.shopName);
           }
+          if (this.activeViewController?.updateLogoUrl) {
+            this.activeViewController.updateLogoUrl(this.logoUrl);
+          }
         }).catch(() => {});
 
         api.getMe().then((me) => {
@@ -65,7 +69,33 @@ class App {
         return;
       }
 
-      // Desktop Flow
+      // --- First-Run Setup Check ---
+      const setupStatus = await api.getSetupStatus().catch(() => ({ is_completed: false, shop_name: '', logo_url: '/assets/logo.png' }));
+
+      if (!setupStatus.is_completed) {
+        // Show the full-screen first-run wizard and wait for unlock
+        const { renderFirstRunGatekeeper } = await import('./modals/firstRunSetupModal.js');
+        renderFirstRunGatekeeper(this.rootEl, {
+          currentName: setupStatus.shop_name || '',
+          currentLogoUrl: setupStatus.logo_url || '/assets/logo.png',
+          onUnlock: async (configuredName, configuredLogoUrl) => {
+            this.shopName = configuredName;
+            this.logoUrl = configuredLogoUrl || '/assets/logo.png';
+            localStorage.setItem('app_shop_name', configuredName);
+            localStorage.setItem('app_logo_url', this.logoUrl);
+            // Boot main app after setup
+            try {
+              const me = await api.getMe();
+              if (me && me.user) this.currentUser = me.user;
+            } catch (_) {}
+            await this.loadArticles();
+            await this.launchMainApp();
+          }
+        });
+        return;
+      }
+
+      // Desktop Flow — setup already done
       try {
         const me = await api.getMe();
         if (me && me.user) {
@@ -73,16 +103,26 @@ class App {
         }
       } catch (_) {}
 
-      // Open app immediately
+      // Load settings (shop name, logo)
       await this.loadSettings();
+
+      // --- License Activation Check (Supabase) ---
+      const licenseStatus = await api.getLicenseStatus().catch(() => ({ allowed: true }));
+      if (!licenseStatus.allowed) {
+        this._showLicenseLockScreen(licenseStatus.message, licenseStatus.shop_name);
+        return;
+      }
+
+      // Open app
       await this.launchMainApp();
     } catch (err) {
       console.error('Fatal initialization error:', err);
       if (this.rootEl) {
+        const sn = this.shopName || 'Your Studio';
         this.rootEl.innerHTML = `
           <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; font-family: -apple-system, sans-serif;">
             <div style="font-size: 38px; margin-bottom: 12px;">👗</div>
-            <h2 style="font-size: 18px; color: #4A0E17; margin: 0 0 8px;">Mehak Bridal Studio</h2>
+            <h2 style="font-size: 18px; color: #4A0E17; margin: 0 0 8px;">${sn}</h2>
             <p style="font-size: 13px; color: #666; max-width: 320px; margin-bottom: 18px;">Failed to initialize studio. Tap reload to retry.</p>
             <button onclick="location.reload(true)" style="padding: 10px 24px; background: #9E7B3B; color: #FFF; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
               Reload Studio
@@ -128,19 +168,39 @@ class App {
   }
 
   /**
-   * Fetches shop name and branding settings.
+   * Fetches shop name, logo, and branding settings.
    */
   async loadSettings() {
-    const stored = localStorage.getItem('bhavi_shop_name');
-    if (stored && stored !== 'Bhavi') {
-      this.shopName = stored;
-    }
+    const storedName = localStorage.getItem('app_shop_name');
+    const storedLogo = localStorage.getItem('app_logo_url');
+    if (storedName) this.shopName = storedName;
+    if (storedLogo) this.logoUrl = storedLogo;
 
+    // 1. Public branding endpoint: works seamlessly without login on mobile capture phones
+    try {
+      const publicRes = await api.getSetupStatus();
+      if (publicRes && publicRes.success) {
+        if (publicRes.shop_name) {
+          this.shopName = publicRes.shop_name;
+          localStorage.setItem('app_shop_name', this.shopName);
+        }
+        if (publicRes.logo_url) {
+          this.logoUrl = publicRes.logo_url;
+          localStorage.setItem('app_logo_url', this.logoUrl);
+        }
+      }
+    } catch (_) {}
+
+    // 2. Also try full settings if authenticated
     try {
       const res = await api.getSettings();
       if (res.success && res.settings?.shop_name) {
         this.shopName = res.settings.shop_name;
-        localStorage.setItem('bhavi_shop_name', res.settings.shop_name);
+        localStorage.setItem('app_shop_name', res.settings.shop_name);
+      }
+      if (res.success && res.settings?.shop_logo_url) {
+        this.logoUrl = res.settings.shop_logo_url;
+        localStorage.setItem('app_logo_url', this.logoUrl);
       }
     } catch (_) {}
   }
@@ -171,6 +231,7 @@ class App {
     if (this.viewMode === 'mobile') {
       this.activeViewController = createMobileBookingView(this.rootEl, {
         shopName: this.shopName,
+        logoUrl: this.logoUrl,
         currentUser: this.currentUser,
         onBookingCreated: (newArticle) => {
           this.articles = [newArticle, ...this.articles];
@@ -180,9 +241,11 @@ class App {
       this.activeViewController = createDesktopDashboard(this.rootEl, {
         articles: this.articles,
         shopName: this.shopName,
+        logoUrl: this.logoUrl,
         currentUser: this.currentUser,
         onStateChange: (delta) => {
           if (delta.shopName) this.shopName = delta.shopName;
+          if (delta.logoUrl) this.logoUrl = delta.logoUrl;
         },
         onUserChange: (user) => {
           this.currentUser = user;
@@ -242,9 +305,16 @@ class App {
         }
       } else if (event.type === 'SETTINGS_UPDATED' && event.settings?.shop_name) {
         this.shopName = event.settings.shop_name;
-        localStorage.setItem('bhavi_shop_name', this.shopName);
+        localStorage.setItem('app_shop_name', this.shopName);
+        if (event.settings.shop_logo_url) {
+          this.logoUrl = event.settings.shop_logo_url;
+          localStorage.setItem('app_logo_url', this.logoUrl);
+        }
         if (this.activeViewController?.updateShopName) {
           this.activeViewController.updateShopName(this.shopName);
+        }
+        if (this.activeViewController?.updateLogoUrl) {
+          this.activeViewController.updateLogoUrl(this.logoUrl);
         }
       }
     });
@@ -268,6 +338,85 @@ class App {
         }
       } catch (_) {}
     }, 4000);
+  }
+
+  /**
+   * Renders a full-screen "License Inactive" lock screen.
+   * The app is completely inaccessible until the vendor activates the license in Supabase.
+   */
+  _showLicenseLockScreen(message, shopName) {
+    const sn = shopName || this.shopName || 'Your Studio';
+    const logo = this.logoUrl || '/assets/logo.png';
+    if (this.rootEl) {
+      this.rootEl.innerHTML = `
+        <div style="
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: radial-gradient(ellipse at 50% 0%, #1a0308 0%, #0e0105 100%);
+          padding: 28px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          text-align: center;
+        ">
+          <style>
+            @keyframes lockPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.04);opacity:1} }
+          </style>
+
+          <div style="
+            width: 84px; height: 84px;
+            border-radius: 18px;
+            background: #fff;
+            border: 2px solid rgba(212,160,23,0.3);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 18px; padding: 8px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.55);
+            animation: lockPulse 2.5s ease-in-out infinite;
+          ">
+            <img src="${logo}" alt="${sn}" style="width:100%;height:100%;object-fit:contain;"
+              onerror="this.parentElement.innerHTML='<span style=font-size:40px>🔒</span>'" />
+          </div>
+
+          <div style="font-size: 32px; margin-bottom: 10px;">🔒</div>
+
+          <h1 style="font-size: 20px; font-weight: 800; color: #F5E6C8; margin: 0 0 6px;">
+            ${sn}
+          </h1>
+
+          <div style="
+            display: inline-block;
+            background: rgba(220,38,38,0.15);
+            border: 1px solid rgba(220,38,38,0.35);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #FCA5A5;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            margin-bottom: 18px;
+          ">License Inactive</div>
+
+          <p style="font-size: 14px; color: rgba(245,230,200,0.6); max-width: 340px; line-height: 1.65; margin: 0 0 28px;">
+            ${message || 'Your license is not active. Contact your vendor to activate this installation.'}
+          </p>
+
+          <div style="display:flex; flex-direction:column; gap:10px; width:100%; max-width:260px;">
+            <button onclick="location.reload(true)" style="
+              padding: 12px 24px;
+              background: linear-gradient(135deg, #C9920A, #D4A017);
+              color: #1a0308; border: none; border-radius: 10px;
+              font-weight: 700; font-size: 14px; cursor: pointer; letter-spacing: 0.03em;
+            ">🔄 Retry Connection</button>
+            <div style="font-size: 11px; color: rgba(245,230,200,0.28); line-height: 1.6;">
+              Store: <strong style="color:rgba(245,230,200,0.45);">${sn}</strong><br>
+              Ask your vendor to activate this store in the dashboard.
+            </div>
+          </div>
+        </div>
+      `;
+    }
   }
 }
 

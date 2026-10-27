@@ -37,7 +37,7 @@ function getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalanc
   const numSecurity = Number(article.security_deposit || 0);
   const secLine = numSecurity > 0 ? `*Security Deposit:* Rs. ${formatINR(numSecurity)}\n` : '';
   const dueLine = numBalance <= 0 ? `*Balance Due:* Rs. 0 (Paid in Full)` : `*Balance Due:* Rs. ${formatINR(numBalance)}`;
-  const storeBrand = (shopName && shopName.trim()) ? shopName.trim() : 'Mehak Bridal Studio';
+  const storeBrand = (shopName && shopName.trim()) ? shopName.trim() : 'Bridal Studio';
   const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
     ? article.title
     : (article.category || 'Bridal');
@@ -71,10 +71,10 @@ function getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalanc
 /**
  * Opens the article detail modal.
  * @param {object} article - Full article object
- * @param {string} [shopName='Mehak Bridal Studio'] - Boutique name
+ * @param {string} [shopName='Bridal Studio'] - Boutique name
  * @param {object} [callbacks] - { onUpdate, onDelete }
  */
-export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio', { onUpdate, onDelete, currentUser } = {}) {
+export function openArticleDetailModal(article, shopName = 'Bridal Studio', { onUpdate, onDelete, currentUser } = {}) {
   if (!article) return;
 
   const numPrice = Number(article.price) || 0;
@@ -340,6 +340,9 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
 
         <div class="footer-actions-right">
           ${article.customer_phone ? `
+            <button type="button" class="btn btn-outline btn-sm btn-send-pickup-reminder" title="Send 1-Day Pickup Reminder to Customer">
+              ${renderIcon('bell', { size: 14 })} Pickup Reminder
+            </button>
             <button type="button" class="btn btn-whatsapp btn-sm btn-send-wa" title="Send WhatsApp Bill">
               ${renderIcon('messageCircle', { size: 15 })} WhatsApp Bill
             </button>
@@ -479,6 +482,31 @@ export function openArticleDetailModal(article, shopName = 'Mehak Bridal Studio'
   if (waBtn) {
     waBtn.addEventListener('click', () => {
       openWhatsAppBillModal(article, shopName);
+    });
+  }
+
+  // 1-Day Pickup Reminder trigger
+  const btnPickupReminder = modalEl.querySelector('.btn-send-pickup-reminder');
+  if (btnPickupReminder) {
+    btnPickupReminder.addEventListener('click', async () => {
+      btnPickupReminder.disabled = true;
+      btnPickupReminder.innerHTML = `${renderIcon('refreshCw', { size: 14 })} Sending...`;
+      try {
+        const res = await api.sendPickupReminder(article.id);
+        if (res && res.success) {
+          showToast(`✅ Pickup reminder sent to ${article.customer_name || 'Customer'}!`, 'success');
+        } else if (res && res.details && res.details.whatsapp_url) {
+          window.open(res.details.whatsapp_url, '_blank');
+          showToast('Opening WhatsApp reminder link...', 'neutral');
+        } else {
+          showToast(res.message || 'Could not send pickup reminder', 'warning');
+        }
+      } catch (e) {
+        showToast('Error sending pickup reminder', 'warning');
+      } finally {
+        btnPickupReminder.disabled = false;
+        btnPickupReminder.innerHTML = `${renderIcon('bell', { size: 14 })} Pickup Reminder`;
+      }
     });
   }
 

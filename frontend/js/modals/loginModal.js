@@ -19,7 +19,7 @@ export function openLoginModal(onSuccess) {
   content.innerHTML = `
     <div style="text-align: center; margin-bottom: 20px;">
       <div style="width: 64px; height: 64px; border-radius: 12px; background: #FFFFFF; border: 1px solid var(--gold-border); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(158, 123, 59, 0.12); padding: 4px; overflow: hidden;">
-        <img src="/assets/logo.png" alt="Mehak Bridal Studio" style="width: 100%; height: 100%; object-fit: contain;" />
+        <img src="${localStorage.getItem('app_logo_url') || '/assets/logo.png'}" alt="Studio Logo" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='/assets/logo.png'" />
       </div>
       <h2 style="font-family: var(--font-serif); font-size: 20px; color: var(--color-text); margin: 0 0 4px 0;">Owner Sign In</h2>
       <p style="font-size: 13px; color: var(--color-text-muted); margin: 0;">Access showroom inventory and administrative settings</p>

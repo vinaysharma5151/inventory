@@ -237,13 +237,8 @@ def reset_database():
         except sqlite3.OperationalError:
             pass
 
-        # Insert initial clean settings
-        cursor.execute(
-            "INSERT INTO settings (key, value) VALUES ('shop_name', 'Mehak Bridal Studio');"
-        )
-        cursor.execute(
-            "INSERT INTO settings (key, value) VALUES ('first_time_setup_completed', 'true');"
-        )
+        # NOTE: shop_name, first_time_setup_completed, and shop_logo_url are intentionally
+        # NOT pre-seeded after reset. The setup wizard will run on next app launch.
 
         conn.commit()
 

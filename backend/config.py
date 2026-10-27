@@ -10,6 +10,17 @@ import os
 import sys
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
+# Supabase License Credentials (server-side only — never served to browser)
+# ---------------------------------------------------------------------------
+SUPABASE_URL = "https://wyxzoqggpbpmfmbmzlwa.supabase.co"
+SUPABASE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+    ".eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5eHpvcWdncGJwbWZtYm16bHdhIiwicm9sZSI6"
+    "ImFub24iLCJpYXQiOjE3ODUyOTk4MjUsImV4cCI6MjEwMDg3NTgyNX0"
+    ".qBqPSyxegjwSKuo2WJ2EZY09cWOhn4THK-PL4MN4qjc"
+)
+
 if getattr(sys, "frozen", False):
     # Running inside a PyInstaller .exe bundle
     DATA_DIR = Path(sys.executable).resolve().parent
@@ -25,7 +36,7 @@ else:
 APP_ENV = "prod"
 IS_DEV = False
 
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 DB_PATH = DATA_DIR / "lehenga_inventory.sqlite"
 UPLOADS_DIR = DATA_DIR / "uploads"
 LOGS_DIR = DATA_DIR / "logs"

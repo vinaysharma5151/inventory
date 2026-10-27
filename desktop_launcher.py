@@ -90,7 +90,7 @@ def main():
     # Pre-check: If port 8000 is already active, another instance is running
     if is_port_in_use(8000):
         print("=" * 65)
-        print("   MEHAK BRIDAL STUDIO — ALREADY RUNNING")
+        print("   BRIDAL STUDIO APP — ALREADY RUNNING")
         print("=" * 65)
         print("  The server is already running in another window on this PC.")
         print("  Opening your browser now: http://localhost:8000")
@@ -105,8 +105,21 @@ def main():
 
     local_ip = get_local_ip()
 
+    # Read configured shop name from DB if available
+    display_title = "BRIDAL STUDIO"
+    try:
+        import sqlite3
+        if DB_PATH.exists():
+            _c = sqlite3.connect(DB_PATH)
+            _r = _c.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
+            if _r and _r[0]:
+                display_title = str(_r[0]).strip().upper()
+            _c.close()
+    except Exception:
+        pass
+
     print("=" * 65)
-    print("   MEHAK BRIDAL STUDIO — LEHENGA BOOKING & INVENTORY SYSTEM")
+    print(f"   {display_title} — BOOKING & INVENTORY SYSTEM")
     print("=" * 65)
     print("  * Environment:        PRODUCTION (Clean Showroom)")
     print(f"  * Database:           {DB_PATH.name}")

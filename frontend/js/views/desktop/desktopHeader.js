@@ -13,6 +13,8 @@ import { openAddArticleModal } from '../../modals/addArticleModal.js';
 import { openQrPairingModal } from '../../modals/qrPairingModal.js';
 import { openShopNameModal } from '../../modals/shopNameModal.js';
 import { openPrinterModal } from '../../modals/printerModal.js';
+import { openUpdateModal } from '../../modals/updateModal.js';
+import { openWhatsAppSettingsModal } from '../../modals/whatsappSettingsModal.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -29,13 +31,14 @@ function escapeHtml(str) {
  * @param {object|null} currentUser
  * @returns {string}
  */
-export function renderHeaderHTML(shopName, currentUser) {
+export function renderHeaderHTML(shopName, currentUser, logoUrl = null) {
+  const activeLogo = logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
   return `
     <header class="dashboard-header">
       <div class="header-inner">
         <div class="brand-badge-group">
           <div class="brand-logo-icon" title="${escapeHtml(shopName)}">
-            <img src="/assets/logo.png" alt="${escapeHtml(shopName)}" class="brand-logo-img" />
+            <img src="${activeLogo}" alt="${escapeHtml(shopName)}" class="brand-logo-img" onerror="this.src='/assets/logo.png'" />
           </div>
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -64,8 +67,17 @@ export function renderHeaderHTML(shopName, currentUser) {
             ${renderIcon('printer', { size: 15 })} Printer
           </button>
 
+          <button type="button" id="btn-wa-header-setup" class="btn btn-outline btn-sm" title="Configure Meta WhatsApp Business Cloud API & automated dispatch">
+            ${renderIcon('messageCircle', { size: 15 })} WhatsApp
+          </button>
+
           <button type="button" id="btn-backup" class="btn btn-outline btn-sm" title="Backup all inventory records to CSV file in app folder">
             ${renderIcon('database', { size: 15 })} Backup
+          </button>
+
+          <button type="button" id="btn-updates" class="btn btn-outline btn-sm" title="Check for software updates from GitHub" style="position: relative;">
+            ${renderIcon('refreshCw', { size: 14 })} Updates
+            <span id="update-badge-dot" style="display: none; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: #28a745; box-shadow: 0 0 4px #28a745;"></span>
           </button>
 
           <button type="button" id="btn-add-garment" class="btn btn-gold btn-sm">
@@ -88,11 +100,36 @@ export function bindHeaderEvents(containerEl, callbacks) {
   const btnEditShop = containerEl.querySelector('#btn-edit-shop');
   const btnQr = containerEl.querySelector('#btn-qr-modal');
   const btnPrinter = containerEl.querySelector('#btn-printer-setup');
+  const btnWaSetup = containerEl.querySelector('#btn-wa-header-setup');
   const btnBackup = containerEl.querySelector('#btn-backup') || containerEl.querySelector('#btn-export-csv');
+  const btnUpdates = containerEl.querySelector('#btn-updates');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
   const btnLogout = containerEl.querySelector('#btn-logout');
 
   if (btnPrinter) btnPrinter.addEventListener('click', openPrinterModal);
+  if (btnWaSetup) btnWaSetup.addEventListener('click', () => openWhatsAppSettingsModal());
+
+  if (btnUpdates) {
+    let latestUpdateInfo = null;
+
+    btnUpdates.addEventListener('click', () => {
+      openUpdateModal(latestUpdateInfo);
+    });
+
+    // Quiet background check after 3 seconds of startup to avoid delaying dashboard rendering
+    setTimeout(async () => {
+      try {
+        const check = await api.checkForUpdates();
+        if (check && check.update_available) {
+          latestUpdateInfo = check;
+          const dot = containerEl.querySelector('#update-badge-dot');
+          if (dot) dot.style.display = 'block';
+        }
+      } catch (_) {
+        // Silently ignore background network errors
+      }
+    }, 3000);
+  }
 
   if (btnEditShop) {
     btnEditShop.addEventListener('click', () => {
@@ -110,7 +147,7 @@ export function bindHeaderEvents(containerEl, callbacks) {
   if (btnAdd) {
     btnAdd.addEventListener('click', () => {
       const brandTitle = containerEl.querySelector('#brand-shop-name');
-      const currentName = brandTitle ? brandTitle.textContent.trim() : 'Mehak Bridal Studio';
+      const currentName = brandTitle ? brandTitle.textContent.trim() : 'Bridal Studio';
       openAddArticleModal((newArt) => {
         if (onArticleAdded) onArticleAdded(newArt);
       }, currentName);

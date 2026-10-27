@@ -19,7 +19,7 @@ const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];
-  let shopName = state.shopName || 'Mehak Bridal Studio';
+  let shopName = state.shopName || 'Bridal Studio';
   let currentUser = state.currentUser || null;
 
   // Filters State
@@ -37,16 +37,30 @@ export function createDesktopDashboard(containerEl, state) {
     filterRangeEnd: '',
   };
 
+  let logoUrl = state.logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
+
   // Mount Base Layout
   containerEl.innerHTML = `
     <div class="desktop-dashboard-wrapper">
-      ${renderHeaderHTML(shopName, currentUser)}
+      ${renderHeaderHTML(shopName, currentUser, logoUrl)}
 
       <main class="dashboard-main-content">
         <!-- Search & Filter Card -->
         <section class="search-filter-card">
-          <!-- Summary Metrics Strip (At Top of Search Bar) -->
-          <div class="dashboard-metrics-summary" id="dashboard-metrics-summary">
+          <!-- Summary Metrics Toggle Header -->
+          <div class="dashboard-metrics-header" id="dashboard-metrics-header">
+            <div class="metrics-header-info">
+              <span class="metrics-header-icon">${renderIcon('layers', { size: 15, color: 'var(--gold)' })}</span>
+              <span class="metrics-header-title">Showroom Summary</span>
+            </div>
+            <button type="button" id="btn-toggle-metrics" class="metrics-toggle-btn" title="Click to view total items and payment details">
+              <span id="metrics-toggle-icon">${renderIcon('eye', { size: 14 })}</span>
+              <span id="metrics-toggle-label">Show Amount &amp; Items</span>
+            </button>
+          </div>
+
+          <!-- Summary Metrics Strip (Hidden by default, shown on button click) -->
+          <div class="dashboard-metrics-summary is-hidden" id="dashboard-metrics-summary">
             <div class="summary-metric-card metric-card-items" title="Total pieces currently matching active filters">
               <div class="summary-metric-icon">
                 ${renderIcon('layers', { size: 18, color: 'var(--gold)' })}
@@ -347,6 +361,29 @@ export function createDesktopDashboard(containerEl, state) {
       gridContainer.appendChild(card);
     });
   };
+
+  // Toggle Details of Amount & Items
+  const btnToggleMetrics = containerEl.querySelector('#btn-toggle-metrics');
+  const metricsSummary = containerEl.querySelector('#dashboard-metrics-summary');
+  const metricsIcon = containerEl.querySelector('#metrics-toggle-icon');
+  const metricsLabel = containerEl.querySelector('#metrics-toggle-label');
+
+  if (btnToggleMetrics && metricsSummary) {
+    btnToggleMetrics.addEventListener('click', () => {
+      const isHidden = metricsSummary.classList.toggle('is-hidden');
+      if (isHidden) {
+        if (metricsIcon) metricsIcon.innerHTML = renderIcon('eye', { size: 14 });
+        if (metricsLabel) metricsLabel.textContent = 'Show Amount & Items';
+        btnToggleMetrics.classList.remove('active');
+        btnToggleMetrics.title = 'Click to view total items and payment details';
+      } else {
+        if (metricsIcon) metricsIcon.innerHTML = renderIcon('eyeOff', { size: 14 });
+        if (metricsLabel) metricsLabel.textContent = 'Hide Amount & Items';
+        btnToggleMetrics.classList.add('active');
+        btnToggleMetrics.title = 'Click to hide total items and payment details';
+      }
+    });
+  }
 
   // Wire Filter Events
   searchInput.addEventListener('input', (e) => {

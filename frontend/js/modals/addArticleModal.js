@@ -27,7 +27,7 @@ function escapeHtml(str) {
  * @param {function} [onCreated] - Callback receiving the newly created article object
  * @param {string} [shopName] - Store brand title
  */
-export function openAddArticleModal(onCreated, shopName = 'Mehak Bridal Studio') {
+export function openAddArticleModal(onCreated, shopName = 'Bridal Studio') {
   let photoBlob = null;
   let photoUrl = null;
 

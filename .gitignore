@@ -33,6 +33,7 @@ ehthumbs.db
 *.sqlite-wal
 *.sqlite-shm
 *.sqlite-journal
+*.local_backup
 
 # Keep directories but ignore runtime content
 uploads/*

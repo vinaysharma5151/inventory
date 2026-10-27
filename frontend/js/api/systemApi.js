@@ -220,5 +220,33 @@ export const systemApi = {
       body: JSON.stringify({ printer_name: printerName || '' })
     });
     return res.json();
+  },
+
+  /**
+   * Checks GitHub Releases for software updates.
+   * @returns {Promise<{success: boolean, update_available: boolean, current_version: string, latest_version: string, release_notes: string, download_url: string, asset_name: string, asset_size: number, message: string}>}
+   */
+  async checkForUpdates() {
+    const res = await request(`${API_BASE}/updates/check`);
+    return res.json();
+  },
+
+  /**
+   * Downloads and applies the specified update release asset.
+   * @param {string} downloadUrl - GitHub releases binary download URL
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  async applyUpdate(downloadUrl) {
+    const res = await request(`${API_BASE}/updates/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ download_url: downloadUrl })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.detail || data.message || 'Update failed');
+    }
+    return data;
   }
 };
+

@@ -55,8 +55,8 @@ export function openShopNameModal(currentName = '', onSave) {
             type="text"
             id="shop-name-input"
             class="input-field"
-            value="${escapeHtml(currentName || 'Mehak Bridal Studio')}"
-            placeholder="e.g. Mehak Bridal Studio"
+            value="${escapeHtml(currentName || 'Bridal Studio')}"
+            placeholder="e.g. Luxury Bridal Atelier"
             required
           />
         </div>

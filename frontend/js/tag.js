@@ -331,8 +331,8 @@ function getThermalStyles() {
  * @param {string} storeBrand - Shop or atelier name
  * @returns {string} HTML string
  */
-export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL STUDIO') {
-  const brand = (storeBrand && storeBrand.trim()) ? storeBrand.trim().toUpperCase() : 'MEHAK BRIDAL STUDIO';
+export function generateThermalReceiptHtml(article, storeBrand = 'BRIDAL STUDIO') {
+  const brand = (storeBrand && storeBrand.trim()) ? storeBrand.trim().toUpperCase() : 'BRIDAL STUDIO';
 
   const numPrice = Number(article.price) || 0;
   const numAdvance = Number(article.advance_amount) || 0;
@@ -519,12 +519,12 @@ export function generateThermalReceiptHtml(article, storeBrand = 'MEHAK BRIDAL S
  * Tries direct 1-click ESC/POS silent print via Windows Spooler first.
  * If printer is offline, seamlessly falls back to browser print with 35mm clearance.
  * @param {object} article - Article data model
- * @param {string} [shopName='MEHAK BRIDAL STUDIO'] - Boutique name
+ * @param {string} [shopName='BRIDAL STUDIO'] - Boutique name
  */
 export async function printThermalBill(article, shopName = '') {
   if (!article) return;
 
-  const storeBrand = (shopName && shopName.trim()) ? shopName.trim().toUpperCase() : 'MEHAK BRIDAL STUDIO';
+  const storeBrand = (shopName && shopName.trim()) ? shopName.trim().toUpperCase() : 'BRIDAL STUDIO';
 
   // 1. Direct 1-Click Silent Print via ESC/POS Spooler (zero popup dialogs)
   try {

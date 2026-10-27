@@ -34,9 +34,11 @@ if not exist "frontend\index.html" (
 )
 echo [2/3] Verified vanilla web assets in frontend\...
 
-:: 4. Build single-file executable using PyInstaller spec
-echo [3/3] Compiling LehengaBooking.exe with PyInstaller...
-%PY_CMD% -m PyInstaller --noconfirm LehengaBooking.spec
+:: 4. Clean previous build caches & compile single-file executable
+echo [3/3] Compiling fresh LehengaBooking.exe with PyInstaller...
+if exist "build" rmdir /s /q "build"
+if exist "dist" rmdir /s /q "dist"
+%PY_CMD% -m PyInstaller --noconfirm --clean LehengaBooking.spec
 
 if exist "dist\LehengaBooking.exe" (
     copy /y "dist\LehengaBooking.exe" "LehengaBooking.exe" >nul
