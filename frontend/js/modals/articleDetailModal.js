@@ -1,20 +1,19 @@
 /**
- * articleDetailModal.js — Full Garment Details, WhatsApp Bill & Actions Modal
+ * articleDetailModal.js — Full Garment Details, SMS Bill & Actions Modal
  * 
  * WHY:
  * Provides the central command view for a single bridal piece. Staff can inspect
- * customer details, send instant automated WhatsApp e-bills, print physical tags,
+ * customer details, send instant automated SMS e-bills via SIM,
  * clear remaining balance dues, or delete obsolete pieces.
  */
 
 import { openModal, closeModal } from '../modal.js';
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
-import { printThermalBill, printGarmentTag } from '../tag.js?v=9';
 import { showToast } from '../toast.js';
 import { openClearoutModal } from './clearoutModal.js';
 import { openEditArticleModal } from './editArticleModal.js?v=8';
-import { openWhatsAppBillModal } from './whatsappModal.js';
+import { openSmsBillModal } from './smsModal.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -25,47 +24,6 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-/**
- * Builds the direct WhatsApp click-to-chat URL as a fallback when Cloud API is unconfigured.
- */
-function getDirectWhatsAppUrl(article, shopName, numPrice, numAdvance, numBalance, customEbillText) {
-  if (!article.customer_phone) return null;
-  const cleanPhone = article.customer_phone.replace(/\D/g, '');
-  const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  const numSecurity = Number(article.security_deposit || 0);
-  const secLine = numSecurity > 0 ? `*Security Deposit:* Rs. ${formatINR(numSecurity)}\n` : '';
-  const dueLine = numBalance <= 0 ? `*Balance Due:* Rs. 0 (Paid in Full)` : `*Balance Due:* Rs. ${formatINR(numBalance)}`;
-  const storeBrand = (shopName && shopName.trim()) ? shopName.trim() : 'Bridal Studio';
-  const displayTitle = (article.title && !article.title.startsWith('Booking –') && !article.title.startsWith('Booking -') && article.title !== article.customer_name)
-    ? article.title
-    : (article.category || 'Bridal');
-  const text = encodeURIComponent(
-    customEbillText || (
-      `*${storeBrand.toUpperCase()}*\n` +
-      `*Booking Confirmation & E-Bill*\n` +
-      `----------------------------------------\n` +
-      `Dear *${article.customer_name || 'Customer'}*,\n` +
-      `Thank you for choosing ${storeBrand}! Here is your booking summary:\n\n` +
-      `*Article Code:* ${article.article_id}\n` +
-      `*Outfit:* ${String(displayTitle).replace(/[–—]/g, '-')}\n` +
-      `*Pickup Date:* ${article.pickup_date || 'N/A'}\n` +
-      `*Return Date:* ${article.return_date || 'N/A'}\n\n` +
-      `*Total Rent:* Rs. ${formatINR(numPrice)}\n` +
-      `*Advance Paid:* Rs. ${formatINR(numAdvance)}\n` +
-      secLine +
-      `${dueLine}\n\n` +
-      `----------------------------------------\n` +
-      `*TERMS & CONDITIONS:*\n` +
-      `1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n` +
-      `2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n` +
-      `----------------------------------------\n` +
-      `*${storeBrand}*\n` +
-      `Kindly present this e-receipt or Article Code during garment pickup.`
-    )
-  );
-  return `https://wa.me/${fullPhone}?text=${text}`;
 }
 
 /**
@@ -340,18 +298,12 @@ export function openArticleDetailModal(article, shopName = 'Bridal Studio', { on
 
         <div class="footer-actions-right">
           ${article.customer_phone ? `
-            <button type="button" class="btn btn-outline btn-sm btn-send-pickup-reminder" title="Send 1-Day Pickup Reminder to Customer">
-              ${renderIcon('bell', { size: 14 })} Pickup Reminder
-            </button>
-            <button type="button" class="btn btn-whatsapp btn-sm btn-send-wa" title="Send WhatsApp Bill">
-              ${renderIcon('messageCircle', { size: 15 })} WhatsApp Bill
+            <button type="button" class="btn btn-sms btn-sm btn-send-sms" title="Send Plain Text SMS Bill via SIM">
+              ${renderIcon('messageSquare', { size: 15 })} SMS Bill
             </button>
           ` : ''}
 
           <button type="button" class="btn btn-outline btn-sm btn-close-modal">Close</button>
-          <button type="button" class="btn btn-gold btn-sm btn-print-tag btn-print-bill" title="Send Print Request directly to Thermal Printer">
-            ${renderIcon('printer', { size: 15 })} Print Bill (Thermal)
-          </button>
         </div>
       </div>
     </div>
@@ -453,14 +405,6 @@ export function openArticleDetailModal(article, shopName = 'Bridal Studio', { on
     btn.addEventListener('click', handleReturn);
   });
 
-  // Print bill trigger
-  const printBtn = modalEl.querySelector('.btn-print-bill, .btn-print-tag');
-  if (printBtn) {
-    printBtn.addEventListener('click', () => {
-      printThermalBill(article, shopName);
-    });
-  }
-
   // Delete article trigger
   const deleteBtn = modalEl.querySelector('.btn-delete-article');
   deleteBtn.addEventListener('click', async () => {
@@ -477,36 +421,11 @@ export function openArticleDetailModal(article, shopName = 'Bridal Studio', { on
     }
   });
 
-  // WhatsApp bill trigger: Open WhatsApp E-Bill Dispatcher
-  const waBtn = modalEl.querySelector('.btn-send-wa');
-  if (waBtn) {
-    waBtn.addEventListener('click', () => {
-      openWhatsAppBillModal(article, shopName);
-    });
-  }
-
-  // 1-Day Pickup Reminder trigger
-  const btnPickupReminder = modalEl.querySelector('.btn-send-pickup-reminder');
-  if (btnPickupReminder) {
-    btnPickupReminder.addEventListener('click', async () => {
-      btnPickupReminder.disabled = true;
-      btnPickupReminder.innerHTML = `${renderIcon('refreshCw', { size: 14 })} Sending...`;
-      try {
-        const res = await api.sendPickupReminder(article.id);
-        if (res && res.success) {
-          showToast(`✅ Pickup reminder sent to ${article.customer_name || 'Customer'}!`, 'success');
-        } else if (res && res.details && res.details.whatsapp_url) {
-          window.open(res.details.whatsapp_url, '_blank');
-          showToast('Opening WhatsApp reminder link...', 'neutral');
-        } else {
-          showToast(res.message || 'Could not send pickup reminder', 'warning');
-        }
-      } catch (e) {
-        showToast('Error sending pickup reminder', 'warning');
-      } finally {
-        btnPickupReminder.disabled = false;
-        btnPickupReminder.innerHTML = `${renderIcon('bell', { size: 14 })} Pickup Reminder`;
-      }
+  // SMS bill trigger: Open SMS E-Bill Dispatcher
+  const smsBtn = modalEl.querySelector('.btn-send-sms');
+  if (smsBtn) {
+    smsBtn.addEventListener('click', () => {
+      openSmsBillModal(article, shopName);
     });
   }
 

@@ -3,7 +3,7 @@
  * 
  * WHY:
  * Encapsulates the branding bar, live SSE pulse indicator, user role badge,
- * and top-level action buttons (QR pairing, staff accounts, WhatsApp, updates, garment creation).
+ * and top-level action buttons (QR pairing, staff accounts, SMS Gateway, updates, garment creation).
  */
 
 import { api } from '../../api.js?v=7';
@@ -12,9 +12,8 @@ import { showToast } from '../../toast.js';
 import { openAddArticleModal } from '../../modals/addArticleModal.js';
 import { openQrPairingModal } from '../../modals/qrPairingModal.js';
 import { openShopNameModal } from '../../modals/shopNameModal.js';
-import { openPrinterModal } from '../../modals/printerModal.js';
 import { openUpdateModal } from '../../modals/updateModal.js';
-import { openWhatsAppSettingsModal } from '../../modals/whatsappSettingsModal.js';
+import { openSmsSettingsModal } from '../../modals/smsSettingsModal.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -63,12 +62,12 @@ export function renderHeaderHTML(shopName, currentUser, logoUrl = null) {
             ${renderIcon('qrcode', { size: 15 })} Phone Camera QR
           </button>
 
-          <button type="button" id="btn-printer-setup" class="btn btn-outline btn-sm" title="Configure PIXEL DP82 thermal printer & test cut">
-            ${renderIcon('printer', { size: 15 })} Printer
+          <button type="button" id="btn-check-reminders" class="btn btn-outline btn-sm" title="Check & dispatch 1-day pickup and return reminders for today">
+            ${renderIcon('bell', { size: 14 })} Check Reminders
           </button>
 
-          <button type="button" id="btn-wa-header-setup" class="btn btn-outline btn-sm" title="Configure Meta WhatsApp Business Cloud API & automated dispatch">
-            ${renderIcon('messageCircle', { size: 15 })} WhatsApp
+          <button type="button" id="btn-sms-header-setup" class="btn btn-outline btn-sm" title="Configure Android SMS Gateway (Capcom6) to dispatch SMS via SIM">
+            ${renderIcon('messageSquare', { size: 15 })} SMS Gateway
           </button>
 
           <button type="button" id="btn-backup" class="btn btn-outline btn-sm" title="Backup all inventory records to CSV file in app folder">
@@ -99,15 +98,35 @@ export function bindHeaderEvents(containerEl, callbacks) {
 
   const btnEditShop = containerEl.querySelector('#btn-edit-shop');
   const btnQr = containerEl.querySelector('#btn-qr-modal');
-  const btnPrinter = containerEl.querySelector('#btn-printer-setup');
-  const btnWaSetup = containerEl.querySelector('#btn-wa-header-setup');
+  const btnCheckReminders = containerEl.querySelector('#btn-check-reminders');
+  const btnSmsSetup = containerEl.querySelector('#btn-sms-header-setup');
   const btnBackup = containerEl.querySelector('#btn-backup') || containerEl.querySelector('#btn-export-csv');
   const btnUpdates = containerEl.querySelector('#btn-updates');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
   const btnLogout = containerEl.querySelector('#btn-logout');
 
-  if (btnPrinter) btnPrinter.addEventListener('click', openPrinterModal);
-  if (btnWaSetup) btnWaSetup.addEventListener('click', () => openWhatsAppSettingsModal());
+  if (btnCheckReminders) {
+    btnCheckReminders.addEventListener('click', async () => {
+      btnCheckReminders.disabled = true;
+      btnCheckReminders.innerHTML = `${renderIcon('refreshCw', { size: 14, className: 'spinner-icon' })} Checking...`;
+      try {
+        const res = await api.checkReminders();
+        const total = res.total_sent || 0;
+        if (total > 0) {
+          showToast(`🔔 Dispatched ${total} reminder(s): ${res.pickup_reminders_sent} pickup, ${res.return_reminders_sent} return`, 'success', 6000);
+        } else {
+          showToast('✅ All reminders are up to date! (0 pending for tomorrow)', 'neutral', 4000);
+        }
+      } catch (err) {
+        showToast('Error checking reminders: ' + (err.message || 'Check gateway'), 'error', 5000);
+      } finally {
+        btnCheckReminders.disabled = false;
+        btnCheckReminders.innerHTML = `${renderIcon('bell', { size: 14 })} Check Reminders`;
+      }
+    });
+  }
+
+  if (btnSmsSetup) btnSmsSetup.addEventListener('click', () => openSmsSettingsModal());
 
   if (btnUpdates) {
     let latestUpdateInfo = null;

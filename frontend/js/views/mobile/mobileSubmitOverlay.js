@@ -3,7 +3,7 @@
  * 
  * WHY:
  * Isolates the full-screen progress state, saving animation, and post-booking
- * options (one-tap WhatsApp e-bill dispatch and next-garment reset).
+ * options (one-tap SMS e-bill dispatch and next-garment reset).
  */
 
 import { renderIcon } from '../../icons.js';
@@ -70,32 +70,14 @@ export function initSubmitOverlay(containerEl, callbacks = {}) {
         overlayActions.style.gap = '8px';
         overlayActions.innerHTML = `
           ${hasPhone ? `
-            <button type="button" id="btn-m-wa-booking" class="btn btn-whatsapp" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
-              ${renderIcon('messageCircle', { size: 18, color: '#FFFFFF' })} Send WhatsApp E-Bill
-            </button>
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid #10B981; color: #065F46; padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; text-align: center; margin-top: 6px;">
+              ✓ SMS E-Bill sent to customer!
+            </div>
           ` : ''}
-          <button type="button" id="btn-m-next-booking" class="${hasPhone ? 'btn btn-outline' : 'btn btn-gold'}" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; ${hasPhone ? '' : 'margin-top: 6px;'}">
+          <button type="button" id="btn-m-next-booking" class="btn btn-gold" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
             Next Garment
           </button>
         `;
-
-        const btnWa = overlayActions.querySelector('#btn-m-wa-booking');
-        if (btnWa) {
-          btnWa.addEventListener('click', async () => {
-            btnWa.disabled = true;
-            try {
-              const res = await api.sendWhatsAppBill(article.id);
-              if (res && res.whatsapp_url) {
-                window.open(res.whatsapp_url, '_blank');
-              }
-            } catch (e) {
-              const digits = (article.customer_phone || '').replace(/\D/g, '');
-              const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
-              window.open(`https://wa.me/${cleanPhone}`, '_blank');
-            }
-            handleDone();
-          });
-        }
 
         const btnMNext = overlayActions.querySelector('#btn-m-next-booking');
         if (btnMNext) btnMNext.addEventListener('click', handleDone);

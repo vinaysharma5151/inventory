@@ -183,7 +183,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
             <div style="margin-bottom:20px;">
               <h2 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#F5E6C8;">What's Your Shop Name?</h2>
               <p style="margin:0;font-size:13px;color:rgba(245,230,200,0.55);line-height:1.5;">
-                This name will appear on all client invoices, WhatsApp bills, and mobile screens.
+                This name will appear on all client invoices, SMS bills, and mobile screens.
               </p>
             </div>
 

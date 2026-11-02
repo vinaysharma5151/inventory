@@ -5,7 +5,6 @@
 
 @import "./base.css?v=8";
 @import "./components.css?v=8";
-@import "./desktop.css?v=15";
+@import "./desktop.css?v=16";
 @import "./mobile.css?v=9";
 @import "./modals.css?v=9";
-@import "./print.css?v=9";

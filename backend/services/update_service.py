@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import ssl
 import subprocess
 import sys
 import threading
@@ -27,13 +28,15 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+import certifi
+
 from backend.config import APP_VERSION, DATA_DIR
 
 logger = logging.getLogger("lehenga_backend")
 
 # Target GitHub repository details
 GITHUB_OWNER = "vinaysharma5151"
-GITHUB_REPO = "rental_releases"
+GITHUB_REPO = "inventory"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
 EXE_NAME = "LehengaBooking.exe"
 
@@ -59,12 +62,27 @@ def is_newer_version(latest_version_str: str, current_version_str: str) -> bool:
     return latest_tuple > current_tuple
 
 
+def _get_ssl_context() -> ssl.SSLContext:
+    """
+    Creates an SSL context configured with certifi's Mozilla CA certificate bundle.
+    WHY: On Windows (especially in frozen PyInstaller environments), Python often cannot
+    locate the system root CA store, resulting in 'CERTIFICATE_VERIFY_FAILED: unable to get
+    local issuer certificate'. certifi provides a reliable, self-contained root CA bundle.
+    """
+    try:
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception as e:
+        logger.warning("Could not initialize certifi SSL context (%s), falling back to default", str(e))
+        return ssl.create_default_context()
+
+
 def check_github_for_updates() -> Dict[str, Any]:
     """
     Queries GitHub API for the latest published release.
     Returns a structured dictionary with update status, version details, and asset download URL.
     """
     try:
+        ssl_ctx = _get_ssl_context()
         req = urllib.request.Request(
             GITHUB_API_URL,
             headers={
@@ -73,7 +91,7 @@ def check_github_for_updates() -> Dict[str, Any]:
             },
         )
         # 7-second timeout so slow internet never hangs the application
-        with urllib.request.urlopen(req, timeout=7) as resp:
+        with urllib.request.urlopen(req, timeout=7, context=ssl_ctx) as resp:
             if resp.status != 200:
                 return {
                     "success": False,
@@ -156,11 +174,12 @@ def check_github_for_updates() -> Dict[str, Any]:
 def download_file(url: str, dest_path: Path, chunk_size: int = 65536) -> bool:
     """Streams a remote file to disk safely using standard urllib."""
     try:
+        ssl_ctx = _get_ssl_context()
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "LehengaBooking-Updater/1.0"},
         )
-        with urllib.request.urlopen(req, timeout=120) as response, open(dest_path, "wb") as out_file:
+        with urllib.request.urlopen(req, timeout=120, context=ssl_ctx) as response, open(dest_path, "wb") as out_file:
             while True:
                 chunk = response.read(chunk_size)
                 if not chunk:

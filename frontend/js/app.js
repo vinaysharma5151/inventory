@@ -14,6 +14,7 @@ import { playLiveSyncChime, showToast } from './toast.js';
 import { createDesktopDashboard } from './views/desktopDashboard.js?v=15';
 import { createMobileBookingView } from './views/mobileBookingView.js?v=15';
 import { openLoginModal } from './modals/loginModal.js';
+import { initSmsQueueWidget, refreshSmsQueue } from './views/desktop/smsQueueWidget.js';
 
 class App {
   constructor() {
@@ -149,6 +150,17 @@ class App {
     // 3. Start real-time Server-Sent Events (SSE) sync (desktop only to prevent mobile connection limits)
     if (this.viewMode !== 'mobile') {
       this.initRealtimeSync();
+      initSmsQueueWidget();
+
+      // Automatic check for 1-day pickup & return reminders on app open
+      setTimeout(async () => {
+        try {
+          const res = await api.checkReminders();
+          if (res && res.total_sent > 0) {
+            showToast(`🔔 Auto-Dispatched ${res.total_sent} reminder(s): ${res.pickup_reminders_sent} pickup, ${res.return_reminders_sent} return`, 'success', 6000);
+          }
+        } catch (_) {}
+      }, 2000);
     }
 
     // 4. Handle window resize gracefully
@@ -303,6 +315,15 @@ class App {
         if (this.activeViewController?.updateArticles) {
           this.activeViewController.updateArticles(this.articles);
         }
+      } else if (event.type === 'SMS_SENT' && event.data) {
+        const d = event.data;
+        const typeStr = d.type || 'SMS Message';
+        const recipStr = d.recipient ? ` to ${d.recipient}` : '';
+        const phoneStr = d.phone ? ` (${d.phone})` : '';
+        showToast(`📱 SMS Sent: ${typeStr}${recipStr}${phoneStr}`, 'success', 5000);
+        refreshSmsQueue();
+      } else if (event.type === 'SMS_QUEUE_UPDATE') {
+        refreshSmsQueue();
       } else if (event.type === 'SETTINGS_UPDATED' && event.settings?.shop_name) {
         this.shopName = event.settings.shop_name;
         localStorage.setItem('app_shop_name', this.shopName);

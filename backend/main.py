@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import APP_VERSION, FRONTEND_DIR, LOGS_DIR, UPLOADS_DIR
 from backend.database import init_db
-from backend.routes import articles, auth, salesmen, system, whatsapp
+from backend.routes import articles, auth, salesmen, sms, system
 
 # ---------------------------------------------------------------------------
 # Secure Rotating File Logger
@@ -50,13 +50,6 @@ if not logger.handlers:
 async def lifespan(app: FastAPI):
     logger.info("Initializing database and application services...")
     init_db()
-    try:
-        from backend.services.whatsapp import dispatch_due_pickup_reminders
-        res = dispatch_due_pickup_reminders()
-        if res.get("sent_count", 0) > 0:
-            logger.info(f"[WHATSAPP] Sent {res['sent_count']} pickup reminder(s) on startup.")
-    except Exception as e:
-        logger.warning(f"[WHATSAPP] Startup reminder check notice: {e}")
     logger.info("Application ready.")
     yield
 
@@ -160,7 +153,7 @@ app.include_router(auth.router,     prefix="/api")
 app.include_router(articles.router, prefix="/api")
 app.include_router(salesmen.router, prefix="/api")
 app.include_router(system.router,   prefix="/api")
-app.include_router(whatsapp.router, prefix="/api")
+app.include_router(sms.router,      prefix="/api")
 
 # ---------------------------------------------------------------------------
 # Frontend SPA Fallback (No Node.js or Vite required at runtime)

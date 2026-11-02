@@ -3,17 +3,16 @@
  * 
  * WHY:
  * Encapsulates the UI markup, payment math, and interactive actions (details modal,
- * thermal tag printing, WhatsApp e-bill sending, dues clearout) for a single article.
+ * SMS e-bill sending via SIM, dues clearout) for a single article.
  */
 
 import { api } from '../../api.js?v=7';
 import { renderIcon } from '../../icons.js';
-import { printThermalBill, printGarmentTag } from '../../tag.js?v=11';
 import { showToast } from '../../toast.js';
 import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=12';
 import { openClearoutModal } from '../../modals/clearoutModal.js?v=9';
 import { openEditArticleModal } from '../../modals/editArticleModal.js?v=10';
-import { openWhatsAppBillModal } from '../../modals/whatsappModal.js';
+import { openSmsBillModal } from '../../modals/smsModal.js';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
@@ -57,15 +56,6 @@ export function createArticleCard(item, context) {
   );
 
   const stage = (item.status || 'booked').toLowerCase();
-  let stageBadgeHtml = '';
-  if (stage === 'returned') {
-    stageBadgeHtml = `<span class="badge badge-stage-returned" title="Stage 3: Customer returned article back to shop">✅ Returned</span>`;
-  } else if (stage === 'picked_up') {
-    stageBadgeHtml = `<span class="badge badge-stage-picked" title="Stage 2: Customer picked up article & paid all dues">🛍️ Picked Up</span>`;
-  } else {
-    stageBadgeHtml = `<span class="badge badge-stage-booked" title="Stage 1: Article booked with advance given">📌 Booked</span>`;
-  }
-
   const isPaid = numPrice > 0 && (numBalance === 0 || stage === 'picked_up' || stage === 'returned');
   const hasJewel = Number(item.has_jewellery || 0) === 1;
 
@@ -92,13 +82,7 @@ export function createArticleCard(item, context) {
         <span class="badge badge-gold font-mono card-id-pill" title="Click to copy ID">
           ${escapeHtml(item.article_id)}
         </span>
-        ${stageBadgeHtml}
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
-        ${hasJewel ? `
-          <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.35); font-weight: 600;" title="Matching Jewellery Included">
-            💍 Jewellery
-          </span>
-        ` : ''}
       </div>
 
       <div class="card-header-block">
@@ -189,11 +173,8 @@ export function createArticleCard(item, context) {
         <button type="button" class="btn btn-outline btn-sm card-action-btn btn-edit-action" title="Edit Article Data / Fix Errors">
           ${renderIcon('edit', { size: 13 })} Edit
         </button>
-        <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Thermal Bill / Receipt (Direct to Printer)">
-          ${renderIcon('printer', { size: 13 })} Bill
-        </button>
-        <button type="button" class="btn btn-whatsapp-card btn-sm card-action-btn btn-wa-action" title="Send Formatted E-Bill via WhatsApp">
-          ${renderIcon('messageCircle', { size: 13, color: '#FFFFFF' })} WA
+        <button type="button" class="btn btn-sms-card btn-sm card-action-btn btn-sms-action" title="Send Plain Text SMS Bill via SIM">
+          ${renderIcon('messageSquare', { size: 13, color: '#FFFFFF' })} SMS
         </button>
       </div>
     </div>
@@ -205,8 +186,7 @@ export function createArticleCard(item, context) {
   const idPill = card.querySelector('.card-id-pill');
   const detailsBtn = card.querySelector('.btn-details-action');
   const editBtn = card.querySelector('.btn-edit-action');
-  const tagBtn = card.querySelector('.btn-tag-action');
-  const waBtn = card.querySelector('.btn-wa-action');
+  const smsBtn = card.querySelector('.btn-sms-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
   const markPickedBtn = card.querySelector('.btn-mark-picked-action');
   const markReturnedBtn = card.querySelector('.btn-mark-returned-action');
@@ -240,15 +220,10 @@ export function createArticleCard(item, context) {
     showToast(`Copied ID: ${item.article_id}`, 'neutral');
   });
 
-  tagBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    printGarmentTag(item, shopName);
-  });
-
-  if (waBtn) {
-    waBtn.addEventListener('click', (e) => {
+  if (smsBtn) {
+    smsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openWhatsAppBillModal(item, shopName);
+      openSmsBillModal(item, shopName);
     });
   }
 

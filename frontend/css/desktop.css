@@ -575,6 +575,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  width: 100%;
 }
 
 .card-id-pill {
@@ -795,8 +797,8 @@
 
 .card-actions-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 5px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   margin-top: auto;
   padding-top: 8px;
   align-items: center;
@@ -804,10 +806,10 @@
 
 .card-action-btn {
   height: 33px;
-  padding: 0 4px;
+  padding: 0 6px;
   font-size: 0.74rem;
   font-weight: 600;
-  gap: 4px;
+  gap: 5px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   justify-content: center;
@@ -817,22 +819,23 @@
   box-sizing: border-box;
   letter-spacing: 0.01em;
   transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .card-action-btn:active {
   transform: scale(0.97);
 }
 
-.btn-whatsapp-card {
-  background: #25D366;
+.btn-sms-card {
+  background: #2563EB;
   color: #FFFFFF !important;
-  border: 1px solid #1EBE5D;
+  border: 1px solid #1D4ED8;
 }
 
-.btn-whatsapp-card:hover {
-  background: #1EBE5D;
+.btn-sms-card:hover {
+  background: #1D4ED8;
   color: #FFFFFF !important;
-  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.3);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
 }
 
 /* Empty State */

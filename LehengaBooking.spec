@@ -50,7 +50,7 @@ hiddenimports = [
     "backend.routes.auth",
     "backend.routes.salesmen",
     "backend.routes.system",
-    "backend.routes.whatsapp",
+    "backend.routes.sms",
     "backend.services",
     "backend.services.auth",
     "backend.services.backup_service",
@@ -58,10 +58,10 @@ hiddenimports = [
     "backend.services.image_service",
     "backend.services.licensing",
     "backend.services.qr_service",
-    "backend.services.thermal_printer",
     "backend.services.update_service",
-    "backend.services.whatsapp",
+    "backend.services.sms",
     "logging.handlers",
+    "certifi",
 ]
 
 # Include the lightweight Vanilla HTML/CSS/JS frontend assets inside the executable
@@ -71,7 +71,7 @@ for root, dirs, files in os.walk('frontend'):
         if not f.startswith('.'):
             frontend_files.append((os.path.join(root, f), root))
 
-datas = frontend_files if frontend_files else [('frontend', 'frontend')]
+datas = (frontend_files if frontend_files else [('frontend', 'frontend')]) + collect_data_files('certifi')
 
 
 a = Analysis(

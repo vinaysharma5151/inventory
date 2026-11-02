@@ -7,7 +7,7 @@
  * - ./api/authApi.js: Studio setup, authentication, and audit logs
  * - ./api/articlesApi.js: Inventory, image uploads, dues clearout, and article CRUD
  * - ./api/salesmenApi.js: Staff accounts and instant login
- * - ./api/whatsappApi.js: WhatsApp cloud gateway and e-bill sending
+ * - ./api/smsApi.js: Android SMS Gateway and e-bill sending via SIM
  * - ./api/systemApi.js: Network discovery, settings, backups, and live SSE sync
  */
 
@@ -15,7 +15,7 @@ import { API_BASE, request } from './api/client.js?v=11';
 import { authApi } from './api/authApi.js?v=11';
 import { articlesApi } from './api/articlesApi.js?v=11';
 import { salesmenApi } from './api/salesmenApi.js?v=11';
-import { whatsappApi } from './api/whatsappApi.js?v=11';
+import { smsApi } from './api/smsApi.js?v=11';
 import { systemApi } from './api/systemApi.js?v=11';
 
 // Unified composite API object preserving complete backward compatibility
@@ -23,7 +23,7 @@ export const api = {
   ...authApi,
   ...articlesApi,
   ...salesmenApi,
-  ...whatsappApi,
+  ...smsApi,
   ...systemApi,
 };
 
@@ -34,6 +34,6 @@ export {
   authApi,
   articlesApi,
   salesmenApi,
-  whatsappApi,
+  smsApi,
   systemApi,
 };

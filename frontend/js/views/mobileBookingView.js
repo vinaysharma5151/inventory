@@ -5,7 +5,7 @@
  * Orchestrates mobile showroom camera booking by assembling modular subcomponents:
  * - ./mobile/mobileCamera.js: WebRTC camera viewfinder, resolution capping, and fallback
  * - ./mobile/paymentCalculator.js: Live rental balance math, presets, and visual status
- * - ./mobile/mobileSubmitOverlay.js: Live sync progress and WhatsApp e-bill dispatch
+ * - ./mobile/mobileSubmitOverlay.js: Live sync progress and SMS e-bill dispatch via SIM
  */
 
 import { renderIcon } from '../icons.js';

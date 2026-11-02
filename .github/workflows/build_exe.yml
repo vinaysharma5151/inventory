@@ -41,22 +41,10 @@ jobs:
           path: dist/LehengaBooking.exe
           if-no-files-found: error
 
-      - name: Release to Main Repository Releases (if Tagged)
+      - name: Release to GitHub Releases (if Tagged)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/LehengaBooking.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Release to Public Releases Repo (if RELEASE_PAT is configured)
-        if: startsWith(github.ref, 'refs/tags/v') && env.RELEASE_PAT != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: vinaysharma5151/rental_releases
-          files: dist/LehengaBooking.exe
-          tag_name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
-          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
-

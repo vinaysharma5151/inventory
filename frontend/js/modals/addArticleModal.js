@@ -11,7 +11,7 @@ import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
 import { compressToMediumResolution } from '../imageUtils.js';
 import { showToast } from '../toast.js';
-import { openWhatsAppBillModal } from './whatsappModal.js';
+import { openSmsBillModal } from './smsModal.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -359,10 +359,10 @@ export function openAddArticleModal(onCreated, shopName = 'Bridal Studio') {
         closeModal();
         if (onCreated) onCreated(res.article);
 
-        // Instant post-booking WhatsApp e-bill dispatch prompt
+        // Instant post-booking SMS e-bill dispatch prompt
         const custPhone = (res.article?.customer_phone || '').trim();
         if (custPhone) {
-          openWhatsAppBillModal(res.article, shopName);
+          openSmsBillModal(res.article, shopName);
         }
       } else {
         alert(res.message || 'Failed to add article');

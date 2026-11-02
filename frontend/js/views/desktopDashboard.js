@@ -5,7 +5,7 @@
  * Orchestrates the Desktop Dashboard by assembling modular components:
  * - ./desktop/desktopHeader.js: Studio branding, sync status, and admin action dialogs
  * - ./desktop/desktopFilters.js: Real-time collection search and timeline query engine
- * - ./desktop/articleCard.js: Garment cards with photo, pricing math, tag print, and WhatsApp e-bills
+ * - ./desktop/articleCard.js: Garment cards with photo, pricing math, tag print, and SMS e-bills via SIM
  */
 
 import { renderIcon } from '../icons.js';
@@ -13,7 +13,7 @@ import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
 import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=12';
 import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=9';
-import { createArticleCard } from './desktop/articleCard.js?v=14';
+import { createArticleCard } from './desktop/articleCard.js?v=15';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 

@@ -31,7 +31,14 @@ from backend.services.auth import (
 from backend.services.backup_service import update_inventory_csv_backup
 from backend.services.export_service import generate_inventory_csv_response
 from backend.services.image_service import save_article_image
-from backend.services.thermal_printer import get_active_printer, print_article_thermal
+from backend.services.sms import (
+    generate_sms_ebill_text,
+    send_sms_via_gateway,
+    format_sms_phone_number,
+    get_shop_name,
+    enqueue_failed_sms,
+    get_pending_sms_count,
+)
 from backend.sse import broadcast
 
 router = APIRouter()
@@ -244,6 +251,41 @@ async def create_article(
     )
 
     await broadcast("NEW_ARTICLE", article)
+
+    # Immediately auto-dispatch booking SMS e-bill upon booking submission
+    cust_phone = article.get("customer_phone")
+    if cust_phone:
+        try:
+            clean_phone = format_sms_phone_number(cust_phone)
+            if clean_phone:
+                shop_title = get_shop_name()
+                sms_text = generate_sms_ebill_text(article, shop_title)
+                cust_disp = article.get("customer_name") or "Valued Customer"
+                success, send_msg, _ = await asyncio.to_thread(
+                    send_sms_via_gateway, clean_phone, sms_text, cust_disp
+                )
+                if success:
+                    await broadcast("SMS_SENT", {
+                        "type": "Booking E-Bill",
+                        "recipient": cust_disp,
+                        "phone": clean_phone,
+                        "article_id": article.get("article_id"),
+                    })
+                else:
+                    enqueue_failed_sms(
+                        customer_phone=clean_phone,
+                        customer_name=cust_disp,
+                        message_body=sms_text,
+                        sms_type="Booking E-Bill",
+                        error_message=send_msg,
+                        article_id=article.get("id"),
+                    )
+                    await broadcast("SMS_QUEUE_UPDATE", {
+                        "count": get_pending_sms_count(),
+                    })
+        except Exception as e:
+            # Safe isolation: Never disrupt booking creation if SMS delivery encounters a network issue
+            pass
 
     return {
         "success": True,
@@ -626,49 +668,4 @@ def export_csv(current_user: dict = Depends(require_owner)):
     except Exception:
         pass
     return generate_inventory_csv_response()
-
-
-@router.post("/articles/{article_id}/print-thermal")
-def print_article_direct_thermal(
-    article_id: int,
-    request: Request,
-    payload: dict = None,
-    current_user: dict = Depends(require_staff_or_owner),
-):
-    """
-    Direct 1-click silent printing to PIXEL DP82 thermal printer via Windows Spooler.
-    Formats exact ESC/POS layout, 6-line cutter feed, and auto-cut.
-    """
-    article = _get_or_404(article_id)
-
-    db = get_db()
-    shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
-
-    target_printer = None
-    if payload and payload.get("printer_name"):
-        target_printer = payload.get("printer_name").strip()
-
-    ok, msg = print_article_thermal(article, shop_name, target_printer)
-    if not ok:
-        raise HTTPException(status_code=500, detail=msg)
-
-    active_p = target_printer or get_active_printer() or "PIXEL DP82"
-
-    ip = get_client_ip(request)
-    log_audit_event(
-        db,
-        action="PRINT_THERMAL_BILL",
-        username=current_user.get("username"),
-        role=current_user.get("role"),
-        target_id=str(article_id),
-        details=f"Direct thermal bill printed for article {article.get('article_id')} on {active_p}",
-        ip_address=ip,
-    )
-
-    return {
-        "success": True,
-        "printer": active_p,
-        "message": msg,
-    }
 
