@@ -9,10 +9,10 @@
  * 5. Establishes the real-time Server-Sent Events (SSE) connection for zero-latency live sync.
  */
 
-import { api } from './api.js?v=11';
+import { api } from './api.js?v=12';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js?v=15';
-import { createMobileBookingView } from './views/mobileBookingView.js?v=15';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=16';
+import { createMobileBookingView } from './views/mobileBookingView.js?v=18';
 import { openLoginModal } from './modals/loginModal.js';
 
 class App {
@@ -20,6 +20,7 @@ class App {
     this.rootEl = document.getElementById('app-root');
     this.articles = [];
     this.shopName = localStorage.getItem('app_shop_name') || '';
+    this.shopTagline = localStorage.getItem('app_shop_tagline') || 'LUXURY BRIDAL ATELIER & STUDIO INVENTORY';
     this.logoUrl = localStorage.getItem('app_logo_url') || '/assets/logo.png';
     this.currentUser = null;
     this.activeViewController = null;
@@ -165,6 +166,13 @@ class App {
         }
       }
     });
+
+    // 5. Background scan: auto-dispatch due pickup & return reminders on startup
+    if (this.viewMode !== 'mobile') {
+      setTimeout(() => {
+        api.checkAllReminders().catch(() => {});
+      }, 3000);
+    }
   }
 
   /**
@@ -172,8 +180,10 @@ class App {
    */
   async loadSettings() {
     const storedName = localStorage.getItem('app_shop_name');
+    const storedTagline = localStorage.getItem('app_shop_tagline');
     const storedLogo = localStorage.getItem('app_logo_url');
     if (storedName) this.shopName = storedName;
+    if (storedTagline) this.shopTagline = storedTagline;
     if (storedLogo) this.logoUrl = storedLogo;
 
     // 1. Public branding endpoint: works seamlessly without login on mobile capture phones
@@ -183,6 +193,10 @@ class App {
         if (publicRes.shop_name) {
           this.shopName = publicRes.shop_name;
           localStorage.setItem('app_shop_name', this.shopName);
+        }
+        if (publicRes.shop_tagline) {
+          this.shopTagline = publicRes.shop_tagline;
+          localStorage.setItem('app_shop_tagline', this.shopTagline);
         }
         if (publicRes.logo_url) {
           this.logoUrl = publicRes.logo_url;
@@ -197,6 +211,10 @@ class App {
       if (res.success && res.settings?.shop_name) {
         this.shopName = res.settings.shop_name;
         localStorage.setItem('app_shop_name', res.settings.shop_name);
+      }
+      if (res.success && res.settings?.shop_tagline) {
+        this.shopTagline = res.settings.shop_tagline;
+        localStorage.setItem('app_shop_tagline', res.settings.shop_tagline);
       }
       if (res.success && res.settings?.shop_logo_url) {
         this.logoUrl = res.settings.shop_logo_url;
@@ -235,16 +253,21 @@ class App {
         currentUser: this.currentUser,
         onBookingCreated: (newArticle) => {
           this.articles = [newArticle, ...this.articles];
+        },
+        onBookingUpdated: (updatedArticle) => {
+          this.articles = this.articles.map((a) => (a.id === updatedArticle.id ? updatedArticle : a));
         }
       });
     } else {
       this.activeViewController = createDesktopDashboard(this.rootEl, {
         articles: this.articles,
         shopName: this.shopName,
+        shopTagline: this.shopTagline,
         logoUrl: this.logoUrl,
         currentUser: this.currentUser,
         onStateChange: (delta) => {
           if (delta.shopName) this.shopName = delta.shopName;
+          if (delta.shopTagline) this.shopTagline = delta.shopTagline;
           if (delta.logoUrl) this.logoUrl = delta.logoUrl;
         },
         onUserChange: (user) => {
@@ -303,18 +326,27 @@ class App {
         if (this.activeViewController?.updateArticles) {
           this.activeViewController.updateArticles(this.articles);
         }
-      } else if (event.type === 'SETTINGS_UPDATED' && event.settings?.shop_name) {
-        this.shopName = event.settings.shop_name;
-        localStorage.setItem('app_shop_name', this.shopName);
-        if (event.settings.shop_logo_url) {
+      } else if (event.type === 'SETTINGS_UPDATED') {
+        const delta = {};
+        if (event.settings?.shop_name) {
+          this.shopName = event.settings.shop_name;
+          localStorage.setItem('app_shop_name', this.shopName);
+          delta.shopName = this.shopName;
+        }
+        if (event.settings?.shop_tagline !== undefined) {
+          this.shopTagline = event.settings.shop_tagline;
+          localStorage.setItem('app_shop_tagline', this.shopTagline);
+          delta.shopTagline = this.shopTagline;
+        }
+        if (event.settings?.shop_logo_url) {
           this.logoUrl = event.settings.shop_logo_url;
           localStorage.setItem('app_logo_url', this.logoUrl);
+          delta.logoUrl = this.logoUrl;
         }
-        if (this.activeViewController?.updateShopName) {
-          this.activeViewController.updateShopName(this.shopName);
-        }
-        if (this.activeViewController?.updateLogoUrl) {
-          this.activeViewController.updateLogoUrl(this.logoUrl);
+        if (this.activeViewController?.updateBranding) {
+          this.activeViewController.updateBranding(delta);
+        } else if (this.activeViewController?.updateShopName) {
+          if (delta.shopName) this.activeViewController.updateShopName(delta.shopName);
         }
       }
     });

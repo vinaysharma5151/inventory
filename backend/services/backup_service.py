@@ -83,7 +83,7 @@ def update_inventory_csv_backup() -> dict:
 
     headers = [
         "ID", "Article ID", "Title / Description", "Category",
-        "Customer Name", "Customer Phone", "Customer Address",
+        "Customer Name", "Customer Phone", "Customer Alt Phone", "Customer Address",
         "Booking Date", "Pickup Date", "Return Date",
         "Rental Price (₹)", "Advance Paid (₹)", "Balance Due (₹)",
         "Matching Jewellery", "Jewellery Details", "Jewellery Price (₹)",
@@ -112,6 +112,7 @@ def update_inventory_csv_backup() -> dict:
             sanitize_csv_cell(cat_n),
             sanitize_csv_cell(a.get("customer_name") or "N/A"),
             sanitize_csv_cell(a.get("customer_phone") or "N/A"),
+            sanitize_csv_cell(a.get("customer_alt_phone") or "N/A"),
             sanitize_csv_cell(a.get("customer_address") or "N/A"),
             sanitize_csv_cell(a.get("booking_date") or "N/A"),
             sanitize_csv_cell(a.get("pickup_date") or "N/A"),

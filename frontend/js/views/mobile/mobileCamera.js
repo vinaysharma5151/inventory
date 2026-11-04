@@ -40,6 +40,7 @@ export function initMobileCamera(containerEl, callbacks = {}) {
   let cameraDenied = false;
   let photoBlob = null;
   let photoPreviewUrl = null;
+  let existingPhotoUrl = null;
 
   const stopCamera = () => {
     if (stream) {
@@ -89,6 +90,7 @@ export function initMobileCamera(containerEl, callbacks = {}) {
 
   const setPhoto = (blob) => {
     photoBlob = blob;
+    existingPhotoUrl = null;
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     photoPreviewUrl = URL.createObjectURL(blob);
     if (previewImg) previewImg.src = photoPreviewUrl;
@@ -101,8 +103,27 @@ export function initMobileCamera(containerEl, callbacks = {}) {
     if (callbacks.onPhotoCaptured) callbacks.onPhotoCaptured(blob);
   };
 
+  const showExistingPhoto = (imageUrl) => {
+    stopCamera();
+    photoBlob = null;
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+      photoPreviewUrl = null;
+    }
+    existingPhotoUrl = imageUrl;
+    if (previewImg) {
+      previewImg.src = imageUrl;
+    }
+    if (videoContainer) videoContainer.style.display = 'none';
+    if (fallbackScreen) fallbackScreen.style.display = 'none';
+    if (previewContainer) previewContainer.style.display = 'block';
+
+    if (callbacks.onPhotoCaptured) callbacks.onPhotoCaptured(null);
+  };
+
   const clearPhoto = () => {
     photoBlob = null;
+    existingPhotoUrl = null;
     if (photoPreviewUrl) {
       URL.revokeObjectURL(photoPreviewUrl);
       photoPreviewUrl = null;
@@ -259,7 +280,10 @@ export function initMobileCamera(containerEl, callbacks = {}) {
     start: startCamera,
     stop: stopCamera,
     reset: clearPhoto,
+    showExistingPhoto,
     getPhotoBlob: () => photoBlob,
+    hasPhoto: () => Boolean(photoBlob || existingPhotoUrl),
+    getExistingPhotoUrl: () => existingPhotoUrl,
     destroy() {
       stopCamera();
       if (photoPreviewUrl) {

@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS articles (
     source           TEXT    DEFAULT 'phone',
     customer_name    TEXT,
     customer_phone   TEXT,
+    customer_alt_phone TEXT,
     customer_address TEXT,
     pickup_date      TEXT,
     booking_date     TEXT,
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS articles (
     jewellery_details TEXT,
     jewellery_price  REAL    DEFAULT 0,
     pickup_reminder_sent INTEGER DEFAULT 0,
+    return_reminder_sent INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -163,6 +165,7 @@ CREATE TABLE IF NOT EXISTS settings (
 _MIGRATE_COLUMNS = {
     "customer_name":     "TEXT",
     "customer_phone":    "TEXT",
+    "customer_alt_phone": "TEXT",
     "customer_address":  "TEXT",
     "pickup_date":       "TEXT",
     "booking_date":      "TEXT",
@@ -175,6 +178,7 @@ _MIGRATE_COLUMNS = {
     "jewellery_details": "TEXT",
     "jewellery_price":   "REAL DEFAULT 0",
     "pickup_reminder_sent": "INTEGER DEFAULT 0",
+    "return_reminder_sent": "INTEGER DEFAULT 0",
 }
 
 
@@ -199,6 +203,7 @@ def init_db() -> None:
     # Ensure all rows have a valid stage/status
     db.execute("UPDATE articles SET status = 'booked' WHERE status IS NULL OR TRIM(status) = ''")
     db.execute("CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_articles_customer_alt ON articles(customer_alt_phone)")
 
     # Migrate: drop obsolete color and size columns if present
     if "color" in existing_cols:

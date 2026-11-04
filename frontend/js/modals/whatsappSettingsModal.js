@@ -1,10 +1,9 @@
 /**
- * whatsappSettingsModal.js — Meta WhatsApp Business Cloud API Configuration Modal.
+ * whatsappSettingsModal.js — OpenWA Gateway Configuration Modal.
  * 
  * WHY:
- * Allows the showroom owner to configure the official Meta WhatsApp Business Cloud API
- * credentials (Phone Number ID & Permanent Access Token) and send test pings,
- * switching from manual wa.me links to automated 1-click background WhatsApp dispatch.
+ * Configures the self-hosted OpenWA Gateway (rmyndharis/OpenWA API) for direct 1-click
+ * automated WhatsApp message dispatch. Replaces Meta Cloud API setup and wa.me links.
  */
 
 import { openModal, closeModal } from '../modal.js';
@@ -22,7 +21,7 @@ function escapeHtml(str) {
 }
 
 /**
- * Opens the WhatsApp Settings modal.
+ * Opens the OpenWA WhatsApp Gateway Settings modal.
  * @param {Function} [onSaved] - Callback invoked when settings are updated.
  */
 export async function openWhatsAppSettingsModal(onSaved) {
@@ -34,15 +33,15 @@ export async function openWhatsAppSettingsModal(onSaved) {
       <!-- Header -->
       <div class="modal-header" style="background: linear-gradient(135deg, #075E54 0%, #128C7E 100%); color: #FFFFFF; border-bottom: none; border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0; padding: 18px 24px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; color: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
-            ${renderIcon('messageCircle', { size: 20, color: '#FFFFFF' })}
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; color: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+            ${renderIcon('messageCircle', { size: 22, color: '#FFFFFF' })}
           </div>
           <div>
             <h3 style="margin: 0; font-size: 1.12rem; font-weight: 700; color: #FFFFFF;">
-              Meta WhatsApp Business API
+              OpenWA WhatsApp Gateway
             </h3>
             <p style="margin: 2px 0 0; font-size: 0.8rem; color: rgba(255, 255, 255, 0.85);">
-              Official Cloud API Setup &amp; Dispatch Mode
+              Self-Hosted 1-Click Automated Messaging
             </p>
           </div>
         </div>
@@ -54,154 +53,105 @@ export async function openWhatsAppSettingsModal(onSaved) {
       <!-- Body -->
       <div class="modal-body" style="padding: 22px 24px; background: var(--bg-card, #FFFFFF); display: flex; flex-direction: column; gap: 16px;">
         
-        <!-- Info Banner -->
-        <div style="background: rgba(18, 140, 126, 0.08); border: 1px solid rgba(18, 140, 126, 0.25); border-radius: 8px; padding: 12px 14px; font-size: 0.84rem; line-height: 1.45; color: var(--text-main);">
-          <strong style="color: #075E54; display: block; margin-bottom: 2px;">⚡ Official Automated WhatsApp Dispatch</strong>
-          Messages are dispatched directly to customers through Meta's verified servers without opening browser tabs or manual clicking.
-        </div>
-
-        <!-- Mode Toggle -->
-        <div>
-          <label class="input-label" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 6px;">
-            Dispatch Mode
-          </label>
-          <div style="display: flex; gap: 10px;">
-            <label style="flex: 1; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: var(--bg-surface, #F9FAFB);">
-              <input type="radio" name="wa_mode" value="meta" id="wa-mode-meta" checked style="margin-top: 3px;" />
-              <div>
-                <strong style="font-size: 0.88rem; display: block;">Official Meta Cloud API</strong>
-                <span style="font-size: 0.76rem; color: var(--text-muted, #6B7280);">Automated 1-click background dispatch</span>
-              </div>
-            </label>
-            <label style="flex: 1; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; cursor: pointer; background: var(--bg-surface, #F9FAFB);">
-              <input type="radio" name="wa_mode" value="direct" id="wa-mode-direct" style="margin-top: 3px;" />
-              <div>
-                <strong style="font-size: 0.88rem; display: block;">Direct wa.me Links</strong>
-                <span style="font-size: 0.76rem; color: var(--text-muted, #6B7280);">Opens WhatsApp Web or App</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Phone Number ID -->
-        <div id="section-meta-creds">
-          <div style="margin-bottom: 12px;">
-            <label class="input-label" for="wa-phone-id" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-              Meta Phone Number ID <span style="color: #DC2626;">*</span>
-            </label>
-            <input
-              type="text"
-              id="wa-phone-id"
-              class="form-input"
-              placeholder="e.g. 105847291823746"
-              style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
-            />
-            <span style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
-              Found in Meta for Developers &rarr; WhatsApp &rarr; API Setup &rarr; <strong>Phone number ID</strong>
-            </span>
-          </div>
-
-          <!-- Permanent Access Token -->
-          <div style="margin-bottom: 12px;">
-            <label class="input-label" for="wa-access-token" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-              Meta Permanent Access Token <span style="color: #DC2626;">*</span>
-            </label>
-            <div style="position: relative;">
-              <input
-                type="password"
-                id="wa-access-token"
-                class="form-input"
-                placeholder="Paste EAAG... access token"
-                style="width: 100%; padding-right: 40px; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
-              />
-              <button
-                type="button"
-                id="btn-toggle-token"
-                class="btn btn-ghost btn-sm"
-                style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 4px 8px; color: var(--text-muted);"
-                title="Show / Hide Token"
-              >
-                ${renderIcon('eye', { size: 14 })}
-              </button>
+        <!-- Live Gateway Status Box -->
+        <div id="wa-status-box" style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="wa-status-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 6px #22C55E; display: inline-block;"></span>
+              <strong id="wa-status-title" style="color: #15803D; font-size: 0.92rem;">Checking Gateway...</strong>
             </div>
-            <span id="wa-token-status-hint" style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
-              System User Token with <code>whatsapp_business_messaging</code> permission.
-            </span>
-          </div>
-
-          <!-- Approved Templates Configuration -->
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
-            <div style="margin-bottom: 10px;">
-              <label class="input-label" for="wa-template-name" style="display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-                Booking Confirmation Template Name
-              </label>
-              <input
-                type="text"
-                id="wa-template-name"
-                class="form-input"
-                placeholder="e.g. booking_receipt (optional)"
-                style="width: 100%; font-size: 0.88rem;"
-              />
-            </div>
-
-            <div>
-              <label class="input-label" for="wa-reminder-template-name" style="display: block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-                1-Day Pickup Reminder Template Name
-              </label>
-              <input
-                type="text"
-                id="wa-reminder-template-name"
-                class="form-input"
-                placeholder="e.g. pickup_reminder"
-                style="width: 100%; font-size: 0.88rem;"
-              />
-              <span style="font-size: 0.74rem; color: var(--text-muted, #6B7280); margin-top: 4px; display: block;">
-                Auto-sent to customers 1 day before their garment pickup date.
-              </span>
-            </div>
-
-            <!-- Meta Template Template Guide Copy Box -->
-            <div style="margin-top: 10px; background: #FFFFFF; border: 1px dashed #CBD5E1; border-radius: 6px; padding: 8px 10px; font-size: 0.76rem; color: #475569;">
-              <strong style="color: #0F172A; display: block; margin-bottom: 2px;">📋 Recommended Meta Template (Utility):</strong>
-              <code>Hello {{1}}, reminder from {{2}}: Your outfit {{3}} (Booking #{{4}}) is scheduled for pickup tomorrow, {{5}}! Balance due: {{6}}. Thank you!</code>
-            </div>
-          </div>
-
-          <!-- Automated Pickup Reminders Check -->
-          <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <strong style="font-size: 0.82rem; color: #166534; display: block;">Automated 1-Day Pickup Check</strong>
-              <span style="font-size: 0.74rem; color: #15803D;">Scans tomorrow's scheduled pickups and delivers reminders</span>
-            </div>
-            <button type="button" id="btn-wa-run-reminders" class="btn btn-sm btn-outline" style="background: #FFFFFF; border-color: #86EFAC; color: #166534; font-weight: 600;">
-              ${renderIcon('refreshCw', { size: 13 })} Run Check
+            <button type="button" id="btn-wa-refresh-status" class="btn btn-ghost btn-sm" style="padding: 2px 8px; font-size: 0.76rem; color: #166534;" title="Refresh session status">
+              ${renderIcon('refreshCw', { size: 12 })} Refresh
             </button>
           </div>
-
-          <!-- Connection Diagnostic / Test Ping -->
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px;">
-            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
-              Test Meta API Connection
-            </label>
-            <div style="display: flex; gap: 8px;">
-              <div style="position: relative; flex: 1;">
-                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; font-weight: 600; color: #64748B;">
-                  +91
-                </span>
-                <input
-                  type="tel"
-                  id="wa-test-phone"
-                  class="form-input"
-                  placeholder="10-digit test mobile"
-                  style="padding-left: 44px; width: 100%; font-size: 0.88rem; font-family: var(--font-mono, monospace);"
-                />
-              </div>
-              <button type="button" id="btn-wa-test" class="btn btn-outline btn-sm" style="padding: 0 14px; white-space: nowrap;">
-                ${renderIcon('send', { size: 14 })} Send Test
-              </button>
-            </div>
-            <div id="wa-test-result" style="display: none; margin-top: 8px; font-size: 0.8rem; padding: 8px 10px; border-radius: 6px;"></div>
+          <div id="wa-session-details" style="font-size: 0.82rem; color: #374151; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div><strong>Phone:</strong> <span id="wa-status-phone">—</span></div>
+            <div><strong>Account:</strong> <span id="wa-status-account">—</span></div>
+            <div><strong>Session:</strong> <span id="wa-status-session">—</span></div>
+            <div><strong>Status:</strong> <span id="wa-status-text">—</span></div>
           </div>
+        </div>
+
+        <!-- Server URL -->
+        <div>
+          <label class="input-label" for="wa-server-url" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
+            OpenWA Server URL <span style="color: #DC2626;">*</span>
+          </label>
+          <input
+            type="url"
+            id="wa-server-url"
+            class="form-input"
+            placeholder="https://whatsapp.ajjidihatti.com"
+            value="https://whatsapp.ajjidihatti.com"
+            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
+          />
+          <span style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
+            Base address of your OpenWA server instance.
+          </span>
+        </div>
+
+        <!-- API Key -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="input-label" for="wa-api-key" style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin: 0;">
+              OpenWA API Key <span style="color: #DC2626;">*</span>
+            </label>
+            <button type="button" id="btn-toggle-key" class="btn btn-ghost btn-sm" style="font-size: 0.74rem; padding: 2px 6px;">
+              Show / Hide
+            </button>
+          </div>
+          <input
+            type="password"
+            id="wa-api-key"
+            class="form-input"
+            placeholder="owa_k1_..."
+            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
+          />
+          <span id="wa-key-status-hint" style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
+            API key required for X-API-Key authentication.
+          </span>
+        </div>
+
+        <!-- Optional Session ID -->
+        <div>
+          <label class="input-label" for="wa-session-id" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
+            Target Session ID (Optional)
+          </label>
+          <input
+            type="text"
+            id="wa-session-id"
+            class="form-input"
+            placeholder="Leave empty to auto-detect ready session"
+            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.86rem;"
+          />
+          <span style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
+            Auto-detects the connected ready session when left empty.
+          </span>
+        </div>
+
+        <!-- Test Message Section -->
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px;">
+          <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
+            Test OpenWA Message Dispatch
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <div style="position: relative; flex: 1;">
+              <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; font-weight: 600; color: #64748B;">
+                +91
+              </span>
+              <input
+                type="tel"
+                id="wa-test-phone"
+                class="form-input"
+                placeholder="10-digit mobile number"
+                style="padding-left: 44px; width: 100%; font-size: 0.88rem; font-family: var(--font-mono, monospace);"
+              />
+            </div>
+            <button type="button" id="btn-wa-test" class="btn btn-outline btn-sm" style="padding: 0 14px; white-space: nowrap;">
+              ${renderIcon('send', { size: 14 })} Send Test
+            </button>
+          </div>
+          <div id="wa-test-result" style="display: none; margin-top: 8px; font-size: 0.8rem; padding: 8px 10px; border-radius: 6px;"></div>
         </div>
 
         <!-- Footer Actions -->
@@ -218,85 +168,107 @@ export async function openWhatsAppSettingsModal(onSaved) {
     </div>
   `;
 
-  const phoneIdInput = modalEl.querySelector('#wa-phone-id');
-  const tokenInput = modalEl.querySelector('#wa-access-token');
-  const templateInput = modalEl.querySelector('#wa-template-name');
-  const tokenHint = modalEl.querySelector('#wa-token-status-hint');
-  const btnToggleToken = modalEl.querySelector('#btn-toggle-token');
-  const radioMeta = modalEl.querySelector('#wa-mode-meta');
-  const radioDirect = modalEl.querySelector('#wa-mode-direct');
+  const serverUrlInput = modalEl.querySelector('#wa-server-url');
+  const apiKeyInput = modalEl.querySelector('#wa-api-key');
+  const sessionIdInput = modalEl.querySelector('#wa-session-id');
+  const keyHint = modalEl.querySelector('#wa-key-status-hint');
+  const btnToggleKey = modalEl.querySelector('#btn-toggle-key');
+  const statusBox = modalEl.querySelector('#wa-status-box');
+  const statusDot = modalEl.querySelector('#wa-status-dot');
+  const statusTitle = modalEl.querySelector('#wa-status-title');
+  const statusPhone = modalEl.querySelector('#wa-status-phone');
+  const statusAccount = modalEl.querySelector('#wa-status-account');
+  const statusSession = modalEl.querySelector('#wa-status-session');
+  const statusText = modalEl.querySelector('#wa-status-text');
+  const btnRefreshStatus = modalEl.querySelector('#btn-wa-refresh-status');
   const testPhoneInput = modalEl.querySelector('#wa-test-phone');
   const btnTest = modalEl.querySelector('#btn-wa-test');
-  const templateReminderInput = modalEl.querySelector('#wa-reminder-template-name');
-  const btnRunReminders = modalEl.querySelector('#btn-wa-run-reminders');
   const testResultBox = modalEl.querySelector('#wa-test-result');
   const btnSave = modalEl.querySelector('#btn-wa-settings-save');
   const btnCancel = modalEl.querySelector('#btn-wa-settings-cancel');
   const closeBtnTop = modalEl.querySelector('.modal-close-btn');
 
-  // Toggle token visibility
-  let isPasswordVisible = false;
-  btnToggleToken.addEventListener('click', () => {
-    isPasswordVisible = !isPasswordVisible;
-    tokenInput.type = isPasswordVisible ? 'text' : 'password';
+  // Toggle API key visibility
+  let isKeyVisible = false;
+  btnToggleKey.addEventListener('click', () => {
+    isKeyVisible = !isKeyVisible;
+    apiKeyInput.type = isKeyVisible ? 'text' : 'password';
   });
 
-  // Run Manual 1-Day Pickup Reminders Check
-  if (btnRunReminders) {
-    btnRunReminders.addEventListener('click', async () => {
-      btnRunReminders.disabled = true;
-      btnRunReminders.innerHTML = `${renderIcon('refreshCw', { size: 13 })} Scanning...`;
-      try {
-        const res = await api.checkPickupReminders();
-        if (res && res.success) {
-          showToast(`Pickup Scan: ${res.sent_count} reminder(s) sent out of ${res.total_due} due tomorrow.`, res.sent_count > 0 ? 'success' : 'neutral');
-        } else {
-          showToast(res.error || 'Pickup check encountered an error', 'warning');
-        }
-      } catch (e) {
-        showToast('Failed to run pickup reminder check', 'warning');
-      } finally {
-        btnRunReminders.disabled = false;
-        btnRunReminders.innerHTML = `${renderIcon('refreshCw', { size: 13 })} Run Check`;
-      }
-    });
+  // Render Status
+  function renderStatus(status) {
+    if (status && status.is_ready) {
+      statusBox.style.background = '#F0FDF4';
+      statusBox.style.borderColor = '#BBF7D0';
+      statusDot.style.background = '#22C55E';
+      statusDot.style.boxShadow = '0 0 6px #22C55E';
+      statusTitle.style.color = '#15803D';
+      statusTitle.textContent = '● OpenWA Connected & Ready';
+    } else if (status && status.has_api_key) {
+      statusBox.style.background = '#FFFBEB';
+      statusBox.style.borderColor = '#FDE68A';
+      statusDot.style.background = '#F59E0B';
+      statusDot.style.boxShadow = '0 0 6px #F59E0B';
+      statusTitle.style.color = '#B45309';
+      statusTitle.textContent = `● Gateway Reachable (${status.session_status || 'Session Connecting'})`;
+    } else {
+      statusBox.style.background = '#FEF2F2';
+      statusBox.style.borderColor = '#FECACA';
+      statusDot.style.background = '#EF4444';
+      statusDot.style.boxShadow = '0 0 6px #EF4444';
+      statusTitle.style.color = '#B91C1C';
+      statusTitle.textContent = '● OpenWA Disconnected';
+    }
+
+    statusPhone.textContent = status?.connected_phone ? `+${status.connected_phone}` : 'Not connected';
+    statusAccount.textContent = status?.push_name || 'N/A';
+    statusSession.textContent = status?.session_name || status?.session_id || 'Auto-detect';
+    statusText.textContent = (status?.session_status || 'offline').toUpperCase();
   }
 
-  // Load current configuration
+  // Load configuration & probe status
   async function loadConfig() {
     try {
       const status = await api.getWhatsAppStatus();
       if (status && status.success) {
-        if (status.mode === 'direct') {
-          radioDirect.checked = true;
-        } else {
-          radioMeta.checked = true;
+        if (status.server_url) serverUrlInput.value = status.server_url;
+        if (status.masked_key) {
+          keyHint.innerHTML = `Current Key: <strong style="color: #059669;">${escapeHtml(status.masked_key)}</strong> (Enter new key to replace)`;
         }
-
-        if (status.phone_number_id) {
-          phoneIdInput.value = status.phone_number_id;
+        if (status.session_id) {
+          sessionIdInput.value = status.session_id;
         }
-        if (status.masked_token) {
-          tokenHint.innerHTML = `Current Token: <strong style="color: #059669;">${escapeHtml(status.masked_token)}</strong> (Enter new token only to replace)`;
+        if (status.connected_phone) {
+          testPhoneInput.value = status.connected_phone.replace(/^91/, '');
         }
-        if (status.template_name) {
-          templateInput.value = status.template_name;
-        }
-        if (status.reminder_template_name && templateReminderInput) {
-          templateReminderInput.value = status.reminder_template_name;
-        }
+        renderStatus(status);
       }
     } catch (e) {
-      console.warn('Failed to load WhatsApp status:', e);
+      console.warn('Failed to load OpenWA status:', e);
+      renderStatus({ is_ready: false, has_api_key: false });
     }
   }
 
-  // Test Meta API
+  btnRefreshStatus.addEventListener('click', async () => {
+    btnRefreshStatus.disabled = true;
+    statusTitle.textContent = 'Probing OpenWA session...';
+    try {
+      const status = await api.getWhatsAppStatus();
+      renderStatus(status);
+      showToast('OpenWA status refreshed', 'neutral');
+    } catch (_) {
+      renderStatus({ is_ready: false });
+    } finally {
+      btnRefreshStatus.disabled = false;
+    }
+  });
+
+  // Test Ping
   btnTest.addEventListener('click', async () => {
     const testNum = testPhoneInput.value.trim().replace(/\D/g, '');
     if (!testNum || testNum.length < 10) {
       testPhoneInput.focus();
-      showToast('Please enter a valid 10-digit test mobile number.', 'warning');
+      showToast('Please enter a valid 10-digit mobile number.', 'warning');
       return;
     }
 
@@ -305,16 +277,15 @@ export async function openWhatsAppSettingsModal(onSaved) {
     testResultBox.style.display = 'none';
 
     try {
-      // If user typed a new token or phone ID in the form, save first or test directly
-      const phoneIdVal = phoneIdInput.value.trim();
-      const tokenVal = tokenInput.value.trim();
-      if (phoneIdVal && tokenVal) {
+      // If user typed a new key or URL, save first so test uses current form values
+      const sUrl = serverUrlInput.value.trim();
+      const aKey = apiKeyInput.value.trim();
+      const sId = sessionIdInput.value.trim();
+      if (sUrl && aKey) {
         await api.saveWhatsAppSettings({
-          phone_number_id: phoneIdVal,
-          access_token: tokenVal,
-          mode: radioDirect.checked ? 'direct' : 'meta',
-          template_name: templateInput.value.trim(),
-          reminder_template_name: templateReminderInput ? templateReminderInput.value.trim() : '',
+          server_url: sUrl,
+          api_key: aKey,
+          session_id: sId || null,
         });
       }
 
@@ -325,14 +296,14 @@ export async function openWhatsAppSettingsModal(onSaved) {
         testResultBox.style.background = '#ECFDF5';
         testResultBox.style.color = '#065F46';
         testResultBox.style.border = '1px solid #A7F3D0';
-        testResultBox.innerHTML = `<strong>✅ Success!</strong> ${escapeHtml(res.message || 'Test message delivered successfully.')}`;
+        testResultBox.innerHTML = `<strong>✅ Success!</strong> ${escapeHtml(res.message || 'Test message delivered successfully via OpenWA.')}`;
         showToast('Test WhatsApp message delivered!', 'success');
       } else {
         testResultBox.style.background = '#FEF2F2';
         testResultBox.style.color = '#991B1B';
         testResultBox.style.border = '1px solid #FECACA';
-        testResultBox.innerHTML = `<strong>⚠️ Meta Error:</strong> ${escapeHtml(res.error || 'Failed to dispatch test message. Verify Phone Number ID and Access Token.')}`;
-        showToast('Meta test failed. Check details in modal.', 'warning');
+        testResultBox.innerHTML = `<strong>⚠️ OpenWA Error:</strong> ${escapeHtml(res.error || 'Failed to dispatch test message. Verify server URL and API key.')}`;
+        showToast('OpenWA test failed. Check details in modal.', 'warning');
       }
     } catch (err) {
       testResultBox.style.display = 'block';
@@ -348,15 +319,13 @@ export async function openWhatsAppSettingsModal(onSaved) {
 
   // Save Settings
   btnSave.addEventListener('click', async () => {
-    const isMeta = radioMeta.checked;
-    const phoneId = phoneIdInput.value.trim();
-    const token = tokenInput.value.trim();
-    const template = templateInput.value.trim();
-    const reminderTemplate = templateReminderInput ? templateReminderInput.value.trim() : '';
+    const sUrl = serverUrlInput.value.trim();
+    const aKey = apiKeyInput.value.trim();
+    const sId = sessionIdInput.value.trim();
 
-    if (isMeta && !phoneId) {
-      phoneIdInput.focus();
-      showToast('Please enter your Meta Phone Number ID.', 'warning');
+    if (!sUrl) {
+      serverUrlInput.focus();
+      showToast('Please enter your OpenWA Server URL.', 'warning');
       return;
     }
 
@@ -365,15 +334,13 @@ export async function openWhatsAppSettingsModal(onSaved) {
 
     try {
       const res = await api.saveWhatsAppSettings({
-        phone_number_id: phoneId,
-        access_token: token,
-        mode: isMeta ? 'meta' : 'direct',
-        template_name: template,
-        reminder_template_name: reminderTemplate,
+        server_url: sUrl,
+        api_key: aKey,
+        session_id: sId || null,
       });
 
       if (res && res.success) {
-        showToast('WhatsApp Business API settings saved!', 'success');
+        showToast('OpenWA Gateway settings saved!', 'success');
         closeModal();
         if (onSaved) onSaved(res.config);
       } else {

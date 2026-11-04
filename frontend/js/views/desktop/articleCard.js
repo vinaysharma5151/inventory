@@ -3,12 +3,11 @@
  * 
  * WHY:
  * Encapsulates the UI markup, payment math, and interactive actions (details modal,
- * thermal tag printing, WhatsApp e-bill sending, dues clearout) for a single article.
+ * WhatsApp e-bill sending, dues clearout) for a single article.
  */
 
 import { api } from '../../api.js?v=7';
 import { renderIcon } from '../../icons.js';
-import { printThermalBill, printGarmentTag } from '../../tag.js?v=11';
 import { showToast } from '../../toast.js';
 import { openArticleDetailModal } from '../../modals/articleDetailModal.js?v=12';
 import { openClearoutModal } from '../../modals/clearoutModal.js?v=9';
@@ -48,6 +47,11 @@ export function createArticleCard(item, context) {
       : 'Customer'
   );
 
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const stLower = (item.status || 'booked').toLowerCase();
+  const isPastReturn = Boolean(item.return_date && item.return_date.trim() < todayISO && stLower !== 'returned');
+  const isReturnToday = Boolean(item.return_date && item.return_date.trim() === todayISO && stLower !== 'returned');
+
   const hasDistinctOutfit = Boolean(
     item.title &&
     !item.title.startsWith('Booking –') &&
@@ -62,12 +66,9 @@ export function createArticleCard(item, context) {
     stageBadgeHtml = `<span class="badge badge-stage-returned" title="Stage 3: Customer returned article back to shop">✅ Returned</span>`;
   } else if (stage === 'picked_up') {
     stageBadgeHtml = `<span class="badge badge-stage-picked" title="Stage 2: Customer picked up article & paid all dues">🛍️ Picked Up</span>`;
-  } else {
-    stageBadgeHtml = `<span class="badge badge-stage-booked" title="Stage 1: Article booked with advance given">📌 Booked</span>`;
   }
 
   const isPaid = numPrice > 0 && (numBalance === 0 || stage === 'picked_up' || stage === 'returned');
-  const hasJewel = Number(item.has_jewellery || 0) === 1;
 
   const card = document.createElement('div');
   card.className = `article-studio-card card-stage-${stage}`;
@@ -94,10 +95,11 @@ export function createArticleCard(item, context) {
         </span>
         ${stageBadgeHtml}
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
-        ${hasJewel ? `
-          <span class="badge" style="background: rgba(184, 134, 11, 0.15); color: #8C6A2A; border: 1px solid rgba(184, 134, 11, 0.35); font-weight: 600;" title="Matching Jewellery Included">
-            💍 Jewellery
-          </span>
+        ${isPastReturn ? `
+          <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; font-weight: 700; font-size: 0.7rem;">⚠️ Return Overdue</span>
+        ` : ''}
+        ${isReturnToday ? `
+          <span class="badge" style="background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; font-weight: 700; font-size: 0.7rem;">⏰ Due Today</span>
         ` : ''}
       </div>
 
@@ -106,21 +108,21 @@ export function createArticleCard(item, context) {
           ${escapeHtml(personDisplayName)}
         </h3>
 
-        ${(item.customer_phone || hasDistinctOutfit || hasJewel) ? `
+        ${(item.customer_phone || item.customer_alt_phone || hasDistinctOutfit) ? `
           <div class="card-customer-meta">
             ${item.customer_phone ? `
               <span class="phone-chip font-mono" title="Customer Phone">
                 📞 ${escapeHtml(item.customer_phone)}
               </span>
             ` : ''}
+            ${item.customer_alt_phone ? `
+              <span class="phone-chip font-mono" title="Alternative Phone">
+                📞 Alt: ${escapeHtml(item.customer_alt_phone)}
+              </span>
+            ` : ''}
             ${hasDistinctOutfit ? `
               <span class="outfit-chip" title="Outfit: ${escapeHtml(item.title)}">
                 👗 ${escapeHtml(item.title)}
-              </span>
-            ` : ''}
-            ${hasJewel ? `
-              <span class="jewellery-chip" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; background: #FFF9E6; color: #8C6A2A; border: 1px solid #E6D5A8; padding: 2px 7px; border-radius: 6px; font-weight: 500;" title="Jewellery: ${escapeHtml(item.jewellery_details || 'Matching Set')}">
-                💍 ${escapeHtml(item.jewellery_details || 'Jewellery Set')}${Number(item.jewellery_price) > 0 ? ` (+₹${formatINR(item.jewellery_price)})` : ''}
               </span>
             ` : ''}
           </div>
@@ -138,7 +140,7 @@ export function createArticleCard(item, context) {
             </div>
           ` : ''}
           ${item.return_date ? `
-            <div class="card-date-item card-date-return" title="Customer Return Back Date">
+            <div class="card-date-item card-date-return ${isPastReturn ? 'card-date-overdue' : (isReturnToday ? 'card-date-due-today' : '')}" title="Customer Return Back Date${isPastReturn ? ' (OVERDUE)' : (isReturnToday ? ' (DUE TODAY)' : '')}">
               <span class="card-date-label">
                 ${renderIcon('rotateCcw', { size: 12 })} Return:
               </span>
@@ -189,9 +191,6 @@ export function createArticleCard(item, context) {
         <button type="button" class="btn btn-outline btn-sm card-action-btn btn-edit-action" title="Edit Article Data / Fix Errors">
           ${renderIcon('edit', { size: 13 })} Edit
         </button>
-        <button type="button" class="btn btn-gold btn-sm card-action-btn btn-tag-action" title="Print Thermal Bill / Receipt (Direct to Printer)">
-          ${renderIcon('printer', { size: 13 })} Bill
-        </button>
         <button type="button" class="btn btn-whatsapp-card btn-sm card-action-btn btn-wa-action" title="Send Formatted E-Bill via WhatsApp">
           ${renderIcon('messageCircle', { size: 13, color: '#FFFFFF' })} WA
         </button>
@@ -205,7 +204,6 @@ export function createArticleCard(item, context) {
   const idPill = card.querySelector('.card-id-pill');
   const detailsBtn = card.querySelector('.btn-details-action');
   const editBtn = card.querySelector('.btn-edit-action');
-  const tagBtn = card.querySelector('.btn-tag-action');
   const waBtn = card.querySelector('.btn-wa-action');
   const clearDuesBtn = card.querySelector('.btn-clear-dues-action');
   const markPickedBtn = card.querySelector('.btn-mark-picked-action');
@@ -238,11 +236,6 @@ export function createArticleCard(item, context) {
     e.stopPropagation();
     navigator.clipboard.writeText(item.article_id);
     showToast(`Copied ID: ${item.article_id}`, 'neutral');
-  });
-
-  tagBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    printGarmentTag(item, shopName);
   });
 
   if (waBtn) {

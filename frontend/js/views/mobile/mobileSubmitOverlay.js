@@ -63,6 +63,7 @@ export function initSubmitOverlay(containerEl, callbacks = {}) {
       };
 
       const hasPhone = Boolean((article.customer_phone || '').trim().replace(/\D/g, '').length >= 10);
+      const alreadySent = Boolean(article._wa_dispatched);
 
       if (overlayActions) {
         overlayActions.style.display = 'flex';
@@ -70,11 +71,17 @@ export function initSubmitOverlay(containerEl, callbacks = {}) {
         overlayActions.style.gap = '8px';
         overlayActions.innerHTML = `
           ${hasPhone ? `
-            <button type="button" id="btn-m-wa-booking" class="btn btn-whatsapp" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
-              ${renderIcon('messageCircle', { size: 18, color: '#FFFFFF' })} Send WhatsApp E-Bill
-            </button>
+            ${alreadySent ? `
+              <div style="background: rgba(37, 211, 102, 0.12); border: 1px solid #25D366; color: #075E54; font-size: 0.88rem; font-weight: 600; padding: 10px 14px; border-radius: 8px; text-align: center; margin-top: 6px;">
+                ✓ WhatsApp confirmation & photo sent!
+              </div>
+            ` : `
+              <button type="button" id="btn-m-wa-booking" class="btn btn-whatsapp" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
+                ${renderIcon('messageCircle', { size: 18, color: '#FFFFFF' })} Send WhatsApp Confirmation
+              </button>
+            `}
           ` : ''}
-          <button type="button" id="btn-m-next-booking" class="${hasPhone ? 'btn btn-outline' : 'btn btn-gold'}" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; ${hasPhone ? '' : 'margin-top: 6px;'}">
+          <button type="button" id="btn-m-next-booking" class="${hasPhone && !alreadySent ? 'btn btn-outline' : 'btn btn-gold'}" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 12px; margin-top: 6px;">
             Next Garment
           </button>
         `;
@@ -83,15 +90,16 @@ export function initSubmitOverlay(containerEl, callbacks = {}) {
         if (btnWa) {
           btnWa.addEventListener('click', async () => {
             btnWa.disabled = true;
+            btnWa.innerHTML = `${renderIcon('refreshCw', { size: 16 })} Sending...`;
             try {
               const res = await api.sendWhatsAppBill(article.id);
-              if (res && res.whatsapp_url) {
-                window.open(res.whatsapp_url, '_blank');
+              if (res && res.success) {
+                showToast('✓ WhatsApp E-Bill sent to customer!', 'success');
+              } else {
+                showToast(res.error || res.message || 'Could not send WhatsApp message', 'warning');
               }
             } catch (e) {
-              const digits = (article.customer_phone || '').replace(/\D/g, '');
-              const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
-              window.open(`https://wa.me/${cleanPhone}`, '_blank');
+              showToast('Failed to send WhatsApp message', 'warning');
             }
             handleDone();
           });

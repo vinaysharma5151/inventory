@@ -2,10 +2,9 @@
  * whatsappModal.js — WhatsApp E-Bill Dispatcher & Preview Modal.
  * 
  * WHY:
- * Provides the shopkeeper with a 1-click dispatch interface to send formatted
- * luxury e-bills directly to customers via WhatsApp (wa.me / WhatsApp Desktop).
- * Allows verifying or updating the recipient phone number, copying formatted
- * text, or instantly launching WhatsApp with pre-filled receipt details.
+ * Provides the showroom owner/staff with a direct 1-click dispatch interface to send
+ * formatted luxury e-bills directly to customers via the self-hosted OpenWA Gateway.
+ * Zero browser popups, zero manual clicking.
  */
 
 import { openModal, closeModal } from '../modal.js';
@@ -23,19 +22,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
-
-/**
- * Builds a direct wa.me URL directly on client side as an offline fallback.
- */
-function buildClientFallbackUrl(phoneRaw, text) {
-  if (!phoneRaw) return null;
-  const digits = String(phoneRaw).replace(/\D/g, '');
-  const cleanPhone = digits.length === 10 ? `91${digits}` : (digits.length === 11 && digits.startsWith('0') ? `91${digits.slice(1)}` : digits);
-  if (!cleanPhone || cleanPhone.length < 10) return null;
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-}
-
 /**
  * Opens the WhatsApp E-Bill Dispatcher Modal.
  * @param {object} article - Garment / Booking article object
@@ -51,7 +37,7 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
   const articleId = article.article_id || 'N/A';
 
   modalEl.innerHTML = `
-    <div class="modal-dialog" style="max-width: 540px;">
+    <div class="modal-dialog" style="max-width: 520px;">
       <div class="modal-header" style="background: linear-gradient(135deg, #075E54 0%, #128C7E 100%); color: #FFFFFF; border-bottom: none; border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0; padding: 18px 24px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <div style="width: 38px; height: 38px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; color: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
@@ -63,7 +49,7 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
                 Send WhatsApp E-Bill
               </h3>
               <span id="wa-mode-badge" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(255,255,255,0.2); font-weight: 600;">
-                Checking...
+                Checking Gateway...
               </span>
             </div>
             <p style="margin: 2px 0 0; font-size: 0.8rem; color: rgba(255, 255, 255, 0.85);">
@@ -72,8 +58,8 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
-          <button type="button" id="btn-wa-header-settings" class="btn btn-ghost btn-sm" style="color: #FFFFFF; opacity: 0.9; padding: 4px 8px; font-size: 0.78rem;" title="Configure Meta WhatsApp API credentials">
-            ${renderIcon('settings', { size: 14 })} API Setup
+          <button type="button" id="btn-wa-header-settings" class="btn btn-ghost btn-sm" style="color: #FFFFFF; opacity: 0.9; padding: 4px 8px; font-size: 0.78rem;" title="Configure OpenWA Gateway credentials">
+            ${renderIcon('settings', { size: 14 })} Gateway Setup
           </button>
           <button type="button" class="btn btn-ghost btn-icon-only modal-close-btn" style="color: #FFFFFF; opacity: 0.85;" title="Close">
             ${renderIcon('x', { size: 18 })}
@@ -103,9 +89,6 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
                 style="padding-left: 48px; width: 100%; font-family: var(--font-mono, monospace); font-size: 0.98rem; font-weight: 600;"
               />
             </div>
-            <button type="button" id="btn-wa-refresh" class="btn btn-outline btn-sm" title="Refresh message preview with this number" style="padding: 0 14px;">
-              ${renderIcon('refreshCw', { size: 14 })} Update
-            </button>
           </div>
         </div>
 
@@ -133,26 +116,17 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
             class="btn btn-whatsapp"
             style="width: 100%; justify-content: center; padding: 12px; font-size: 1rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(37, 211, 102, 0.35);"
           >
-            ${renderIcon('send', { size: 17, color: '#FFFFFF' })} <span id="btn-wa-primary-text">Send WhatsApp E-Bill</span>
+            ${renderIcon('send', { size: 17, color: '#FFFFFF' })} <span id="btn-wa-primary-text">Send WhatsApp E-Bill (1-Click)</span>
           </button>
           
-          <div style="display: flex; gap: 8px;">
-            <button
-              type="button"
-              id="btn-wa-launch-app"
-              class="btn btn-outline"
-              style="flex: 1; justify-content: center; font-size: 0.82rem; padding: 8px 10px;"
-              title="Launch native WhatsApp Desktop app for Windows/Mac"
-            >
-              ${renderIcon('externalLink', { size: 13 })} WhatsApp Desktop (wa.me)
-            </button>
+          <div style="display: flex; justify-content: flex-end;">
             <button
               type="button"
               id="btn-wa-close"
               class="btn btn-ghost"
               style="padding: 8px 16px; font-size: 0.85rem;"
             >
-              Cancel
+              Close
             </button>
           </div>
         </div>
@@ -162,17 +136,12 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
 
   // Internal state
   let currentEbillText = '';
-  let currentWaUrl = '';
-  let currentAppUrl = '';
-  let isMetaMode = false;
 
   const phoneInput = modalEl.querySelector('#wa-phone-input');
   const previewBox = modalEl.querySelector('#wa-preview-box');
-  const btnRefresh = modalEl.querySelector('#btn-wa-refresh');
   const btnCopy = modalEl.querySelector('#btn-wa-copy');
   const btnPrimary = modalEl.querySelector('#btn-wa-launch-primary');
   const btnPrimaryText = modalEl.querySelector('#btn-wa-primary-text');
-  const btnApp = modalEl.querySelector('#btn-wa-launch-app');
   const btnClose = modalEl.querySelector('#btn-wa-close');
   const closeBtnTop = modalEl.querySelector('.modal-close-btn');
   const btnHeaderSettings = modalEl.querySelector('#btn-wa-header-settings');
@@ -189,21 +158,21 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
   async function loadStatusAndPreview() {
     try {
       const status = await api.getWhatsAppStatus();
-      if (status && status.is_meta_configured && status.mode !== 'direct') {
-        isMetaMode = true;
-        modeBadge.textContent = 'Meta Cloud API';
+      if (status && status.is_ready) {
+        modeBadge.textContent = `● OpenWA (${status.push_name || status.session_name || 'Ready'})`;
         modeBadge.style.background = '#25D366';
         modeBadge.style.color = '#FFFFFF';
-        btnPrimaryText.textContent = '⚡ Send via Meta Cloud API (1-Click)';
-      } else {
-        isMetaMode = false;
-        modeBadge.textContent = 'Direct wa.me';
-        modeBadge.style.background = 'rgba(255,255,255,0.2)';
+      } else if (status && status.has_api_key) {
+        modeBadge.textContent = '● Connecting...';
+        modeBadge.style.background = '#F59E0B';
         modeBadge.style.color = '#FFFFFF';
-        btnPrimaryText.textContent = 'Open in WhatsApp & Send';
+      } else {
+        modeBadge.textContent = '● Setup Required';
+        modeBadge.style.background = '#EF4444';
+        modeBadge.style.color = '#FFFFFF';
       }
     } catch (_) {
-      isMetaMode = false;
+      modeBadge.textContent = '● OpenWA Offline';
     }
 
     try {
@@ -211,44 +180,19 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
       const data = await api.getEbill(article.id);
       if (data && data.success) {
         currentEbillText = data.ebill_text || '';
-        currentWaUrl = data.whatsapp_url || '';
-        currentAppUrl = data.whatsapp_app_url || '';
         previewBox.textContent = currentEbillText;
         if (data.customer_phone && !phoneInput.value) {
           phoneInput.value = data.customer_phone.replace(/^\+?91/, '');
         }
       } else {
-        currentEbillText = generateClientEbillText(article, shopName);
-        previewBox.textContent = currentEbillText;
+        previewBox.textContent = 'Failed to generate e-bill text.';
       }
     } catch (err) {
-      currentEbillText = generateClientEbillText(article, shopName);
-      previewBox.textContent = currentEbillText;
+      previewBox.textContent = 'Error loading e-bill.';
     }
-    updateUrls();
   }
 
-  function updateUrls() {
-    const rawVal = phoneInput.value.trim().replace(/\D/g, '');
-    if (!rawVal) {
-      currentWaUrl = '';
-      currentAppUrl = '';
-      return;
-    }
-    const fullPhone = rawVal.length === 10 ? `91${rawVal}` : rawVal;
-    const encoded = encodeURIComponent(currentEbillText);
-    currentWaUrl = `https://wa.me/${fullPhone}?text=${encoded}`;
-    currentAppUrl = `whatsapp://send?phone=${fullPhone}&text=${encoded}`;
-  }
-
-  // Events
-  btnRefresh.addEventListener('click', () => {
-    updateUrls();
-    showToast('Phone number updated for e-bill!', 'neutral');
-  });
-
-  phoneInput.addEventListener('input', updateUrls);
-
+  // Copy text handler
   btnCopy.addEventListener('click', async () => {
     if (!currentEbillText) return;
     try {
@@ -263,6 +207,7 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
     }
   });
 
+  // Primary 1-Click Send via OpenWA
   btnPrimary.addEventListener('click', async () => {
     const rawVal = phoneInput.value.trim().replace(/\D/g, '');
     if (!rawVal || rawVal.length < 10) {
@@ -270,74 +215,30 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
       showToast('Please enter a valid 10-digit mobile number.', 'warning');
       return;
     }
-    updateUrls();
 
-    if (isMetaMode) {
-      btnPrimary.disabled = true;
-      btnPrimary.innerHTML = `${renderIcon('refreshCw', { size: 16 })} Sending via Meta API...`;
-      errorBanner.style.display = 'none';
+    btnPrimary.disabled = true;
+    btnPrimary.innerHTML = `${renderIcon('refreshCw', { size: 16 })} Dispatching via OpenWA...`;
+    errorBanner.style.display = 'none';
 
-      try {
-        const res = await api.sendWhatsAppBill(article.id, rawVal, 'meta');
-        if (res && res.direct_sent) {
-          showToast('✅ WhatsApp e-bill sent successfully via Meta Cloud API!', 'success');
-          closeModal();
-          if (options.onSent) options.onSent();
-        } else {
-          // Meta API returned an error: show banner and wa.me fallback
-          const errDetail = res.error || 'Meta API could not deliver message.';
-          errorBanner.innerHTML = `
-            <strong>Meta API Delivery Notice:</strong> ${escapeHtml(errDetail)}<br>
-            <div style="margin-top: 6px;">
-              <button type="button" id="btn-wa-open-fallback" class="btn btn-sm btn-outline" style="background: #FFFFFF; font-weight: 600;">
-                ${renderIcon('externalLink', { size: 12 })} Send via WhatsApp Web (wa.me) Instead
-              </button>
-            </div>
-          `;
-          errorBanner.style.display = 'block';
-
-          const btnFallback = errorBanner.querySelector('#btn-wa-open-fallback');
-          if (btnFallback) {
-            btnFallback.addEventListener('click', () => {
-              if (currentWaUrl) {
-                window.open(currentWaUrl, '_blank');
-                closeModal();
-                if (options.onSent) options.onSent();
-              }
-            });
-          }
-          showToast('Meta dispatch failed. Use WhatsApp Web fallback.', 'warning');
-        }
-      } catch (e) {
-        showToast(e.message || 'Error communicating with server', 'warning');
-      } finally {
-        btnPrimary.disabled = false;
-        btnPrimary.innerHTML = `${renderIcon('send', { size: 17, color: '#FFFFFF' })} <span id="btn-wa-primary-text">⚡ Send via Meta Cloud API (1-Click)</span>`;
-      }
-    } else {
-      // Direct wa.me
-      if (currentWaUrl) {
-        window.open(currentWaUrl, '_blank');
-        showToast('Opening WhatsApp with formatted e-bill...', 'neutral');
+    try {
+      const res = await api.sendWhatsAppBill(article.id, rawVal);
+      if (res && res.success) {
+        showToast(`✓ E-Bill sent directly via WhatsApp to +91 ${rawVal}!`, 'success', 4000);
         closeModal();
         if (options.onSent) options.onSent();
+      } else {
+        const errDetail = res.error || res.message || 'OpenWA server could not dispatch message.';
+        errorBanner.innerHTML = `<strong>⚠️ OpenWA Notice:</strong> ${escapeHtml(errDetail)}`;
+        errorBanner.style.display = 'block';
+        showToast('WhatsApp dispatch failed. Check details in modal.', 'warning');
       }
-    }
-  });
-
-  btnApp.addEventListener('click', () => {
-    const rawVal = phoneInput.value.trim().replace(/\D/g, '');
-    if (!rawVal || rawVal.length < 10) {
-      phoneInput.focus();
-      showToast('Please enter a valid 10-digit mobile number.', 'warning');
-      return;
-    }
-    updateUrls();
-    if (currentWaUrl) {
-      window.open(currentWaUrl, '_blank');
-      showToast('Opening WhatsApp Web...', 'neutral');
-      closeModal();
-      if (options.onSent) options.onSent();
+    } catch (e) {
+      errorBanner.innerHTML = `<strong>⚠️ Connection Error:</strong> ${escapeHtml(e.message || 'Error communicating with server')}`;
+      errorBanner.style.display = 'block';
+      showToast(e.message || 'Error communicating with server', 'warning');
+    } finally {
+      btnPrimary.disabled = false;
+      btnPrimary.innerHTML = `${renderIcon('send', { size: 17, color: '#FFFFFF' })} <span id="btn-wa-primary-text">Send WhatsApp E-Bill (1-Click)</span>`;
     }
   });
 
@@ -347,78 +248,4 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
 
   openModal(modalEl);
   loadStatusAndPreview();
-}
-
-/**
- * Quick 1-click WhatsApp Dispatcher.
- * If Meta API is configured and phone exists, automatically dispatches via Meta Cloud API!
- * If not configured or phone is missing, opens the preview modal.
- */
-export async function quickSendWhatsAppBill(article, shopName = 'Bridal Studio', options = {}) {
-  const phone = (article.customer_phone || '').trim().replace(/\D/g, '');
-  if (!phone || phone.length < 10) {
-    openWhatsAppBillModal(article, shopName, options);
-    return;
-  }
-
-  try {
-    const status = await api.getWhatsAppStatus();
-    if (status && status.is_meta_configured && status.mode !== 'direct') {
-      showToast(`⚡ Sending WhatsApp e-bill via Meta API to ${article.customer_name || 'Customer'}...`, 'neutral');
-      const res = await api.sendWhatsAppBill(article.id, phone, 'meta');
-      if (res && res.direct_sent) {
-        showToast(`✅ E-bill sent via Meta WhatsApp to ${article.customer_name || 'Customer'}!`, 'success');
-        if (options.onSent) options.onSent();
-        return;
-      }
-    }
-  } catch (_) {}
-
-  // Fallback to modal
-  openWhatsAppBillModal(article, shopName, options);
-}
-
-/**
- * Client-side fallback bill generator if server is momentarily unreachable.
- */
-function generateClientEbillText(article, shopName) {
-  const store = shopName || 'Bridal Studio';
-  const name = article.customer_name || 'Valued Customer';
-  const id = article.article_id || 'N/A';
-  const price = Number(article.price || 0);
-  const adv = Number(article.advance_amount || 0);
-  const bal = article.balance_amount !== undefined && article.balance_amount !== null
-    ? Number(article.balance_amount)
-    : Math.max(0, price - adv);
-  const sec = Number(article.security_deposit || 0);
-  const hasJ = Number(article.has_jewellery || 0) === 1;
-  const jewelText = hasJ ? `💍 *Jewellery:* ${article.jewellery_details || 'Matching Set'}\n` : '';
-  const secLine = sec > 0 ? `🛡 *Security Deposit:* Rs. ${formatINR(sec)}\n` : '';
-  const dueLine = bal <= 0 ? '✅ *Balance Due:* Rs. 0 (Paid in Full)' : `⏳ *Balance Due:* Rs. ${formatINR(bal)}`;
-
-  return (
-    `🧾 *E-BILL & BOOKING CONFIRMATION*\n` +
-    `*${store.toUpperCase()}*\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `👤 *Customer:* ${name}\n` +
-    `📱 *Mobile:* ${article.customer_phone || 'N/A'}\n` +
-    `🗓 *Booking ID:* #${id}\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `👗 *Outfit:* ${article.title || article.category || 'Bridal Outfit'}\n` +
-    jewelText +
-    `📅 *Pickup Date:* ${article.pickup_date || 'N/A'}\n` +
-    `🔄 *Return Date:* ${article.return_date || 'N/A'}\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `💰 *Total Rent:* Rs. ${formatINR(price)}\n` +
-    `💵 *Advance Paid:* Rs. ${formatINR(adv)}\n` +
-    secLine +
-    `${dueLine}\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *TERMS & CONDITIONS:*\n` +
-    `1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n` +
-    `2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n` +
-    `━━━━━━━━━━━━━━━━━━━\n` +
-    `🙏 _Thank you for choosing ${store}!_\n` +
-    `📍 _Kindly present this e-receipt or Booking #${id} at pickup._`
-  );
 }

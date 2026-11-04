@@ -63,6 +63,7 @@ CREATE TABLE articles (
     source           TEXT    DEFAULT 'phone',
     customer_name    TEXT,
     customer_phone   TEXT,
+    customer_alt_phone TEXT,
     customer_address TEXT,
     pickup_date      TEXT,
     booking_date     TEXT,
@@ -72,17 +73,20 @@ CREATE TABLE articles (
     has_jewellery    INTEGER DEFAULT 0,
     jewellery_details TEXT,
     jewellery_price  REAL    DEFAULT 0,
+    pickup_reminder_sent INTEGER DEFAULT 0,
+    return_reminder_sent INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_articles_article_id  ON articles(article_id);
-CREATE INDEX idx_articles_status      ON articles(status);
-CREATE INDEX idx_articles_category    ON articles(category);
-CREATE INDEX idx_articles_created     ON articles(created_at);
-CREATE INDEX idx_articles_pickup_date ON articles(pickup_date);
-CREATE INDEX idx_articles_return_date ON articles(return_date);
-CREATE INDEX idx_articles_customer    ON articles(customer_name);
+CREATE INDEX idx_articles_article_id   ON articles(article_id);
+CREATE INDEX idx_articles_status       ON articles(status);
+CREATE INDEX idx_articles_category     ON articles(category);
+CREATE INDEX idx_articles_created      ON articles(created_at);
+CREATE INDEX idx_articles_pickup_date  ON articles(pickup_date);
+CREATE INDEX idx_articles_return_date  ON articles(return_date);
+CREATE INDEX idx_articles_customer     ON articles(customer_name);
+CREATE INDEX idx_articles_customer_alt ON articles(customer_alt_phone);
 
 
 CREATE TABLE users (

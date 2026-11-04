@@ -3,17 +3,15 @@
  * 
  * WHY:
  * Encapsulates the branding bar, live SSE pulse indicator, user role badge,
- * and top-level action buttons (QR pairing, staff accounts, WhatsApp, updates, garment creation).
+ * and top-level action buttons (QR pairing, WhatsApp, backups, garment creation).
  */
 
-import { api } from '../../api.js?v=7';
+import { api } from '../../api.js?v=12';
 import { renderIcon } from '../../icons.js';
 import { showToast } from '../../toast.js';
 import { openAddArticleModal } from '../../modals/addArticleModal.js';
 import { openQrPairingModal } from '../../modals/qrPairingModal.js';
 import { openShopNameModal } from '../../modals/shopNameModal.js';
-import { openPrinterModal } from '../../modals/printerModal.js';
-import { openUpdateModal } from '../../modals/updateModal.js';
 import { openWhatsAppSettingsModal } from '../../modals/whatsappSettingsModal.js';
 
 function escapeHtml(str) {
@@ -31,24 +29,25 @@ function escapeHtml(str) {
  * @param {object|null} currentUser
  * @returns {string}
  */
-export function renderHeaderHTML(shopName, currentUser, logoUrl = null) {
+export function renderHeaderHTML(shopName, currentUser, logoUrl = null, shopTagline = '') {
   const activeLogo = logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
+  const activeTagline = shopTagline || localStorage.getItem('app_shop_tagline') || 'LUXURY BRIDAL ATELIER & STUDIO INVENTORY';
   return `
     <header class="dashboard-header">
       <div class="header-inner">
         <div class="brand-badge-group">
           <div class="brand-logo-icon" title="${escapeHtml(shopName)}">
-            <img src="${activeLogo}" alt="${escapeHtml(shopName)}" class="brand-logo-img" onerror="this.src='/assets/logo.png'" />
+            <img src="${activeLogo}" alt="${escapeHtml(shopName)}" class="brand-logo-img" id="brand-header-logo" onerror="this.src='/assets/logo.png'" />
           </div>
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <h1 class="brand-main-title font-serif" id="brand-shop-name">${escapeHtml(shopName)}</h1>
-              <button type="button" id="btn-edit-shop" title="Change shop name" style="background: none; border: none; cursor: pointer; padding: 2px; color: var(--text-muted); display: inline-flex; align-items: center;">
+              <button type="button" id="btn-edit-shop" title="Change shop name, logo and tagline" style="background: none; border: none; cursor: pointer; padding: 2px; color: var(--text-muted); display: inline-flex; align-items: center;">
                 ${renderIcon('edit', { size: 14 })}
               </button>
             </div>
             <p class="brand-sub">
-              <span>LUXURY BRIDAL ATELIER &amp; STUDIO INVENTORY</span>
+              <span id="brand-shop-tagline">${escapeHtml(activeTagline)}</span>
             </p>
           </div>
         </div>
@@ -63,21 +62,16 @@ export function renderHeaderHTML(shopName, currentUser, logoUrl = null) {
             ${renderIcon('qrcode', { size: 15 })} Phone Camera QR
           </button>
 
-          <button type="button" id="btn-printer-setup" class="btn btn-outline btn-sm" title="Configure PIXEL DP82 thermal printer & test cut">
-            ${renderIcon('printer', { size: 15 })} Printer
+          <button type="button" id="btn-send-reminders-header" class="btn btn-outline btn-sm" title="Scan & send due pickup and return reminders for tomorrow via WhatsApp">
+            ${renderIcon('bell', { size: 15 })} Send Reminders
           </button>
 
-          <button type="button" id="btn-wa-header-setup" class="btn btn-outline btn-sm" title="Configure Meta WhatsApp Business Cloud API & automated dispatch">
+          <button type="button" id="btn-wa-header-setup" class="btn btn-outline btn-sm" title="Configure OpenWA Gateway & automated WhatsApp messaging">
             ${renderIcon('messageCircle', { size: 15 })} WhatsApp
           </button>
 
           <button type="button" id="btn-backup" class="btn btn-outline btn-sm" title="Backup all inventory records to CSV file in app folder">
             ${renderIcon('database', { size: 15 })} Backup
-          </button>
-
-          <button type="button" id="btn-updates" class="btn btn-outline btn-sm" title="Check for software updates from GitHub" style="position: relative;">
-            ${renderIcon('refreshCw', { size: 14 })} Updates
-            <span id="update-badge-dot" style="display: none; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: #28a745; box-shadow: 0 0 4px #28a745;"></span>
           </button>
 
           <button type="button" id="btn-add-garment" class="btn btn-gold btn-sm">
@@ -99,45 +93,76 @@ export function bindHeaderEvents(containerEl, callbacks) {
 
   const btnEditShop = containerEl.querySelector('#btn-edit-shop');
   const btnQr = containerEl.querySelector('#btn-qr-modal');
-  const btnPrinter = containerEl.querySelector('#btn-printer-setup');
   const btnWaSetup = containerEl.querySelector('#btn-wa-header-setup');
+  const btnReminders = containerEl.querySelector('#btn-send-reminders-header');
   const btnBackup = containerEl.querySelector('#btn-backup') || containerEl.querySelector('#btn-export-csv');
-  const btnUpdates = containerEl.querySelector('#btn-updates');
   const btnAdd = containerEl.querySelector('#btn-add-garment');
   const btnLogout = containerEl.querySelector('#btn-logout');
 
-  if (btnPrinter) btnPrinter.addEventListener('click', openPrinterModal);
   if (btnWaSetup) btnWaSetup.addEventListener('click', () => openWhatsAppSettingsModal());
 
-  if (btnUpdates) {
-    let latestUpdateInfo = null;
-
-    btnUpdates.addEventListener('click', () => {
-      openUpdateModal(latestUpdateInfo);
-    });
-
-    // Quiet background check after 3 seconds of startup to avoid delaying dashboard rendering
-    setTimeout(async () => {
+  if (btnReminders) {
+    btnReminders.addEventListener('click', async () => {
+      const originalHtml = btnReminders.innerHTML;
+      btnReminders.disabled = true;
+      btnReminders.innerHTML = `${renderIcon('refreshCw', { size: 14, className: 'spin' })} Checking...`;
       try {
-        const check = await api.checkForUpdates();
-        if (check && check.update_available) {
-          latestUpdateInfo = check;
-          const dot = containerEl.querySelector('#update-badge-dot');
-          if (dot) dot.style.display = 'block';
+        const res = await api.checkAllReminders();
+        if (res && res.success) {
+          const sent = res.total_sent || 0;
+          const due = res.total_due || 0;
+          const failed = res.total_failed || 0;
+
+          if (sent > 0) {
+            showToast(`✓ Sent ${sent} reminder(s) (${res.pickup_sent || 0} pickup, ${res.return_sent || 0} return)!`, 'success', 5000);
+          } else if (due === 0) {
+            showToast('No bookings due for pickup or return tomorrow.', 'info', 4000);
+          } else if (failed > 0) {
+            showToast(`⚠️ ${failed} reminder(s) could not be sent. Please check WhatsApp connection.`, 'warning', 5000);
+          } else {
+            showToast('All due reminders for tomorrow have already been sent.', 'info', 4000);
+          }
+        } else {
+          showToast(res?.message || res?.error || 'Failed to check reminders.', 'warning');
         }
-      } catch (_) {
-        // Silently ignore background network errors
+      } catch (err) {
+        showToast('Error checking reminders: ' + (err.message || 'Network error'), 'warning');
+      } finally {
+        btnReminders.disabled = false;
+        btnReminders.innerHTML = originalHtml;
       }
-    }, 3000);
+    });
   }
 
   if (btnEditShop) {
     btnEditShop.addEventListener('click', () => {
       const brandTitle = containerEl.querySelector('#brand-shop-name');
-      const currentName = brandTitle ? brandTitle.textContent : '';
-      openShopNameModal(currentName, (newName) => {
-        if (brandTitle) brandTitle.textContent = newName;
-        if (onShopNameChange) onShopNameChange(newName);
+      const brandTagline = containerEl.querySelector('#brand-shop-tagline');
+      const brandLogo = containerEl.querySelector('#brand-header-logo');
+
+      const currentName = brandTitle ? brandTitle.textContent.trim() : '';
+      const currentTagline = brandTagline ? brandTagline.textContent.trim() : '';
+      const currentLogo = brandLogo ? brandLogo.src : '';
+
+      openShopNameModal({
+        currentName,
+        currentTagline,
+        currentLogoUrl: currentLogo,
+        onSave: (branding) => {
+          const newName = typeof branding === 'object' ? branding.shopName : branding;
+          const newTagline = typeof branding === 'object' ? branding.shopTagline : '';
+          const newLogo = typeof branding === 'object' ? branding.logoUrl : '';
+
+          if (brandTitle && newName) brandTitle.textContent = newName;
+          if (brandTagline && newTagline) brandTagline.textContent = newTagline;
+          if (brandLogo && newLogo) brandLogo.src = newLogo;
+
+          if (callbacks.onBrandingChange) {
+            callbacks.onBrandingChange({ shopName: newName, shopTagline: newTagline, logoUrl: newLogo });
+          } else if (callbacks.onShopNameChange) {
+            callbacks.onShopNameChange(newName);
+          }
+        }
       });
     });
   }

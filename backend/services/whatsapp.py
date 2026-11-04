@@ -1,32 +1,44 @@
 """
-services/whatsapp.py — Direct WhatsApp Service for Mehak Bridal Studio.
+services/whatsapp.py — OpenWA Gateway Direct Messaging Service.
 
-Responsibilities:
-  - Sanitize and format Indian & International mobile numbers (e.g. 9876543210 -> 919876543210).
-  - Format luxury e-bill text message for customer receipts.
-  - Generate instant direct wa.me / WhatsApp Web click-to-send links.
-  - No gateway server or external third-party API dependencies required.
+WHY:
+Enables direct 1-click automated WhatsApp message dispatch through the self-hosted
+OpenWA Gateway (rmyndharis/OpenWA API). Eliminates reliance on Meta Developer Apps,
+paid Cloud API templates, and manual wa.me browser popups.
+
+Zero external Python dependencies (uses standard library urllib.request).
 """
 
+from __future__ import annotations
+
+import base64
 import json
 import logging
+import mimetypes
 import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
+from backend.config import LOGS_DIR, UPLOADS_DIR
 from backend.database import get_db
 
 logger = logging.getLogger("whatsapp")
 logger.setLevel(logging.INFO)
 
-META_GRAPH_API_VERSION = "v21.0"
+# User-Agent header (prevents reverse-proxies / WAFs from blocking python-urllib)
+HTTP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+# Default pre-configured OpenWA credentials
+DEFAULT_OPENWA_SERVER_URL = "https://whatsapp.ajjidihatti.com"
+DEFAULT_OPENWA_API_KEY = "owa_k1_34994de68ea8f5cefb0a24b24ffbdc16ffdd2ee3979283b68b794e3ed6f43259"
 
 
 def format_phone_number(phone_raw: Optional[str]) -> Optional[str]:
     """
-    Sanitize and normalize customer phone number for WhatsApp wa.me links.
+    Sanitize and normalize customer phone number to WhatsApp international standard.
     - 10 digits (e.g. 9876543210) -> prepends country code '91' -> 919876543210.
     - 11 digits starting with 0 -> strips leading 0 and prepends '91'.
     - If already includes country code (e.g. +919876543210 or 919876543210), keeps digits.
@@ -60,146 +72,284 @@ def get_shop_name() -> str:
     return "Bridal Studio"
 
 
-def get_whatsapp_meta_credentials() -> Dict[str, Optional[str]]:
-    """Retrieve Meta WhatsApp Business Cloud API settings from SQLite."""
+def get_openwa_credentials() -> Dict[str, str]:
+    """
+    Retrieve OpenWA Server URL, API Key, and optional selected Session ID from SQLite settings,
+    falling back to verified default credentials.
+    """
     try:
         db = get_db()
         db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-        rows = db.execute("SELECT key, value FROM settings WHERE key LIKE 'whatsapp_%'").fetchall()
+        rows = db.execute("SELECT key, value FROM settings WHERE key LIKE 'openwa_%'").fetchall()
         settings_map = {row["key"]: row["value"] for row in rows}
+
+        server_url = (settings_map.get("openwa_server_url") or "").strip().rstrip("/")
+        if not server_url:
+            server_url = DEFAULT_OPENWA_SERVER_URL
+
+        api_key = (settings_map.get("openwa_api_key") or "").strip()
+        if not api_key:
+            api_key = DEFAULT_OPENWA_API_KEY
+
+        session_id = (settings_map.get("openwa_session_id") or "").strip()
+
         return {
-            "mode": settings_map.get("whatsapp_mode", "meta" if settings_map.get("whatsapp_meta_phone_number_id") else "direct"),
-            "phone_number_id": settings_map.get("whatsapp_meta_phone_number_id") or "",
-            "access_token": settings_map.get("whatsapp_meta_access_token") or "",
-            "template_name": settings_map.get("whatsapp_meta_template_name") or "",
-            "reminder_template_name": settings_map.get("whatsapp_meta_reminder_template_name") or "",
+            "server_url": server_url,
+            "api_key": api_key,
+            "session_id": session_id,
         }
     except Exception as e:
-        logger.error(f"[WHATSAPP] Failed to load WhatsApp settings: {e}")
+        logger.error(f"[WHATSAPP] Failed to load OpenWA settings: {e}")
         return {
-            "mode": "direct",
-            "phone_number_id": "",
-            "access_token": "",
-            "template_name": "",
-            "reminder_template_name": "",
+            "server_url": DEFAULT_OPENWA_SERVER_URL,
+            "api_key": DEFAULT_OPENWA_API_KEY,
+            "session_id": "",
         }
 
 
-def save_whatsapp_meta_credentials(
-    phone_number_id: str,
-    access_token: str,
-    mode: str = "meta",
-    template_name: Optional[str] = None,
-    reminder_template_name: Optional[str] = None,
+def save_openwa_credentials(
+    server_url: str,
+    api_key: str,
+    session_id: Optional[str] = None,
 ) -> bool:
-    """Save Meta WhatsApp Cloud API credentials in SQLite settings."""
+    """Save OpenWA Server credentials in SQLite settings."""
     try:
         db = get_db()
         db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
         pairs = [
-            ("whatsapp_mode", mode or "meta"),
-            ("whatsapp_meta_phone_number_id", (phone_number_id or "").strip()),
-            ("whatsapp_meta_access_token", (access_token or "").strip()),
-            ("whatsapp_meta_template_name", (template_name or "").strip()),
-            ("whatsapp_meta_reminder_template_name", (reminder_template_name or "").strip()),
+            ("openwa_server_url", (server_url or "").strip().rstrip("/")),
+            ("openwa_api_key", (api_key or "").strip()),
+            ("openwa_session_id", (session_id or "").strip()),
         ]
         for k, v in pairs:
             db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, v))
         db.commit()
         return True
     except Exception as e:
-        logger.error(f"[WHATSAPP] Failed to save credentials: {e}")
+        logger.error(f"[WHATSAPP] Failed to save OpenWA credentials: {e}")
         return False
 
 
+def get_openwa_sessions(
+    server_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> Tuple[bool, List[Dict[str, Any]], str]:
+    """
+    Queries OpenWA GET /api/sessions to list active WhatsApp instances.
+    Returns (success, sessions_list, message).
+    """
+    creds = get_openwa_credentials()
+    target_url = (server_url or creds["server_url"]).rstrip("/")
+    target_key = api_key or creds["api_key"]
+
+    if not target_url or not target_key:
+        return False, [], "OpenWA Server URL or API Key is missing."
+
+    url = f"{target_url}/api/sessions"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "X-API-Key": target_key,
+            "User-Agent": HTTP_USER_AGENT,
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            body = resp.read().decode("utf-8")
+            data = json.loads(body)
+            if isinstance(data, list):
+                return True, data, "Sessions retrieved successfully"
+            return True, [], "No sessions found"
+    except urllib.error.HTTPError as he:
+        try:
+            err_body = he.read().decode("utf-8")
+            err_json = json.loads(err_body)
+            err_msg = err_json.get("message") or f"HTTP {he.code}"
+        except Exception:
+            err_msg = f"HTTP {he.code} {he.reason}"
+        logger.error(f"[WHATSAPP] OpenWA query sessions HTTP error: {err_msg}")
+        return False, [], f"OpenWA error: {err_msg}"
+    except Exception as ex:
+        logger.error(f"[WHATSAPP] OpenWA query sessions network error: {ex}")
+        return False, [], f"Network error connecting to OpenWA: {ex}"
+
+
+def get_openwa_active_session(
+    server_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    session_id_override: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Finds the active/ready WhatsApp session.
+    Prioritizes a session with status == 'ready'.
+    """
+    creds = get_openwa_credentials()
+    target_sid = session_id_override or creds.get("session_id")
+
+    ok, sessions, _ = get_openwa_sessions(server_url, api_key)
+    if not ok or not sessions:
+        return None
+
+    # If specific session configured, check if it exists
+    if target_sid:
+        for s in sessions:
+            if s.get("id") == target_sid:
+                return s
+
+    # Otherwise auto-pick the first 'ready' session
+    for s in sessions:
+        if s.get("status") == "ready":
+            return s
+
+    # Fallback to first session if none marked ready
+    return sessions[0] if sessions else None
+
+
 def get_whatsapp_config() -> Dict[str, Any]:
-    """Retrieve WhatsApp configuration state (Meta Cloud API vs Direct click-to-chat)."""
-    creds = get_whatsapp_meta_credentials()
-    token = creds.get("access_token") or ""
-    phone_id = creds.get("phone_number_id") or ""
-    is_meta_configured = bool(phone_id and token)
-    masked_token = f"{token[:6]}...{token[-4:]}" if len(token) > 12 else ("Configured" if token else "")
+    """
+    Returns full OpenWA gateway configuration and live connection status.
+    Used by dashboard indicators, modals, and settings screens.
+    """
+    creds = get_openwa_credentials()
+    server_url = creds["server_url"]
+    api_key = creds["api_key"]
+    session = get_openwa_active_session()
+
+    masked_key = ""
+    if api_key:
+        masked_key = f"{api_key[:8]}...{api_key[-6:]}" if len(api_key) > 16 else "Configured"
+
+    is_ready = bool(session and session.get("status") == "ready")
 
     return {
         "enabled": True,
-        "mode": creds.get("mode", "meta" if is_meta_configured else "direct"),
-        "is_meta_configured": is_meta_configured,
-        "phone_number_id": phone_id,
-        "masked_token": masked_token,
-        "template_name": creds.get("template_name") or "",
-        "reminder_template_name": creds.get("reminder_template_name") or "",
+        "mode": "openwa",
+        "gateway": "OpenWA Self-Hosted API",
+        "server_url": server_url,
+        "has_api_key": bool(api_key),
+        "masked_key": masked_key,
+        "session_id": session.get("id") if session else None,
+        "session_name": session.get("name") if session else None,
+        "session_status": session.get("status") if session else "disconnected",
+        "connected_phone": session.get("phone") if session else None,
+        "push_name": session.get("pushName") if session else None,
+        "is_ready": is_ready,
         "shop_name": get_shop_name(),
     }
 
 
-def send_meta_whatsapp_message(
+def send_openwa_message(
     to_phone: str,
     message_text: str,
-    phone_number_id: Optional[str] = None,
-    access_token: Optional[str] = None,
-    template_name: Optional[str] = None,
-    template_params: Optional[list] = None,
-    language_code: str = "en",
+    image_path: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
-    Sends a WhatsApp message via official Meta WhatsApp Business Cloud API.
-    Supports both free-form text e-bills and pre-approved Meta message templates.
-    Zero third-party dependencies (pure standard-library urllib.request).
+    Dispatches a WhatsApp message directly via the OpenWA REST API gateway.
+    - Formats target to '{phone}@c.us'.
+    - If image_path exists, dispatches via POST /api/sessions/:sessionId/messages/send-image
+      with base64 payload and e-bill caption.
+    - Otherwise dispatches via POST /api/sessions/:sessionId/messages/send-text.
     """
     clean_phone = format_phone_number(to_phone)
     if not clean_phone:
         return False, "Invalid recipient phone number (must be at least 10 digits).", None
 
-    creds = get_whatsapp_meta_credentials()
-    active_phone_id = (phone_number_id or creds.get("phone_number_id") or "").strip()
-    active_token = (access_token or creds.get("access_token") or "").strip()
-    active_template = (template_name or creds.get("template_name") or "").strip()
+    creds = get_openwa_credentials()
+    server_url = creds["server_url"].rstrip("/")
+    api_key = creds["api_key"]
 
-    if not active_phone_id or not active_token:
-        return False, "Meta WhatsApp API is not configured (Phone Number ID or Access Token missing).", None
+    session = get_openwa_active_session()
+    if not session:
+        return False, "No active WhatsApp session found on OpenWA server. Please verify gateway settings.", None
 
-    url = f"https://graph.facebook.com/{META_GRAPH_API_VERSION}/{active_phone_id}/messages"
+    if session.get("status") != "ready":
+        return False, f"OpenWA session '{session.get('name', 'default')}' is not ready (current status: {session.get('status')}).", session
 
-    # Build payload: template mode vs free-form text mode
-    if active_template:
-        payload: Dict[str, Any] = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": clean_phone,
-            "type": "template",
-            "template": {
-                "name": active_template,
-                "language": {"code": language_code or "en"},
-            },
-        }
-        if template_params:
-            payload["template"]["components"] = [
-                {
-                    "type": "body",
-                    "parameters": [{"type": "text", "text": str(p)} for p in template_params],
-                }
-            ]
-    else:
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": clean_phone,
-            "type": "text",
-            "text": {
-                "preview_url": False,
-                "body": message_text,
-            },
-        }
+    session_id = session["id"]
+    chat_id = f"{clean_phone}@c.us"
 
-    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "X-API-Key": api_key,
+        "Content-Type": "application/json",
+        "User-Agent": HTTP_USER_AGENT,
+        "Accept": "application/json",
+    }
+
+    # Resolve local garment image if available
+    resolved_image_file: Optional[Path] = None
+    if image_path:
+        file_name = Path(image_path).name
+        candidates = [
+            UPLOADS_DIR / file_name,
+            Path(image_path),
+            Path.cwd() / str(image_path).lstrip("/\\"),
+        ]
+        for cand in candidates:
+            if cand.exists() and cand.is_file() and cand.stat().st_size <= 10 * 1024 * 1024:
+                resolved_image_file = cand
+                break
+
+    # Case 1: Send Image with e-bill caption (if photo available and caption <= 1024 chars)
+    if resolved_image_file:
+        try:
+            with open(resolved_image_file, "rb") as f:
+                img_bytes = f.read()
+            b64_str = base64.b64encode(img_bytes).decode("utf-8")
+            mime_type, _ = mimetypes.guess_type(str(resolved_image_file))
+            if not mime_type or not mime_type.startswith("image/"):
+                mime_type = "image/jpeg"
+
+            caption = message_text if len(message_text) <= 1024 else f"{get_shop_name()} — Garment Booking Receipt"
+
+            payload = {
+                "chatId": chat_id,
+                "base64": b64_str,
+                "mimetype": mime_type,
+                "caption": caption,
+            }
+
+            url = f"{server_url}/api/sessions/{session_id}/messages/send-image"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                res_body = json.loads(resp.read().decode("utf-8"))
+                msg_id = res_body.get("messageId") or "sent"
+                logger.info(f"[WHATSAPP] OpenWA image e-bill dispatched to {chat_id}, id={msg_id}")
+
+            # If the full text didn't fit in caption, follow up with complete text
+            if len(message_text) > 1024:
+                text_payload = {"chatId": chat_id, "text": message_text}
+                text_url = f"{server_url}/api/sessions/{session_id}/messages/send-text"
+                req2 = urllib.request.Request(
+                    text_url,
+                    data=json.dumps(text_payload).encode("utf-8"),
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(req2, timeout=15) as resp2:
+                    pass
+
+            return True, f"E-Bill & Garment photo sent successfully to +{clean_phone} via OpenWA!", res_body
+        except Exception as img_err:
+            logger.warning(f"[WHATSAPP] Failed to send image via OpenWA ({img_err}), falling back to text send.")
+
+    # Case 2: Send Text Message
+    payload = {
+        "chatId": chat_id,
+        "text": message_text,
+    }
+    url = f"{server_url}/api/sessions/{session_id}/messages/send-text"
     req = urllib.request.Request(
         url,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {active_token}",
-            "Content-Type": "application/json",
-            "User-Agent": "MehakBridalApp/2.1",
-        },
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
         method="POST",
     )
 
@@ -207,74 +357,79 @@ def send_meta_whatsapp_message(
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode("utf-8")
             res_json = json.loads(body)
-            messages = res_json.get("messages", [])
-            msg_id = messages[0].get("id") if messages else "sent"
-            logger.info(f"[WHATSAPP] Meta Cloud API message sent to {clean_phone}, id={msg_id}")
-            return True, f"Message sent successfully via Meta WhatsApp API (ID: {msg_id})", res_json
+            msg_id = res_json.get("messageId") or "sent"
+            logger.info(f"[WHATSAPP] OpenWA text message dispatched to {chat_id}, id={msg_id}")
+            return True, f"Message sent successfully to +{clean_phone} via OpenWA!", res_json
     except urllib.error.HTTPError as http_err:
         try:
             err_body = http_err.read().decode("utf-8")
             err_json = json.loads(err_body)
-            meta_err = err_json.get("error", {})
-            err_code = meta_err.get("code")
-            meta_msg = meta_err.get("message") or f"HTTP {http_err.code}"
-            meta_details = meta_err.get("error_data", {}).get("details")
-
-            # Human-friendly decoding of common Meta API error codes
-            if err_code == 131047:
-                friendly = (
-                    "24-Hour Window Closed: Customer has not sent a message to the studio in the last 24 hours. "
-                    "Meta requires a pre-approved Message Template to initiate new chats, or use WhatsApp Web (wa.me) fallback."
-                )
-            elif err_code == 190:
-                friendly = "Access Token Expired: Please refresh your Meta Permanent / System User Access Token in WhatsApp Settings."
-            elif err_code == 131026:
-                friendly = "Undeliverable: The recipient number is not registered on WhatsApp or cannot receive messages."
-            elif err_code in (132000, 132001):
-                friendly = f"Template Error: The template '{active_template}' does not exist or has not been approved in Meta Business Suite."
-            else:
-                friendly = f"{meta_msg} ({meta_details})" if meta_details else meta_msg
-
-            logger.error(f"[WHATSAPP] Meta API error {err_code}: {err_body}")
-            return False, friendly, err_json
+            err_msg = err_json.get("message") or f"HTTP {http_err.code}"
         except Exception:
-            logger.error(f"[WHATSAPP] HTTP error: {http_err}")
-            return False, f"Meta WhatsApp API returned HTTP {http_err.code}", None
+            err_msg = f"HTTP {http_err.code} {http_err.reason}"
+        logger.error(f"[WHATSAPP] OpenWA HTTP error: {err_msg}")
+        return False, f"OpenWA server error: {err_msg}", None
     except urllib.error.URLError as url_err:
-        logger.error(f"[WHATSAPP] Network error connecting to Meta: {url_err}")
-        return False, f"Network error connecting to Meta WhatsApp API: {url_err.reason}", None
+        logger.error(f"[WHATSAPP] OpenWA network error: {url_err}")
+        return False, f"Network error connecting to OpenWA: {url_err.reason}", None
     except Exception as exc:
-        logger.error(f"[WHATSAPP] Unexpected error: {exc}")
-        return False, "Failed to send message via Meta WhatsApp API.", None
+        logger.error(f"[WHATSAPP] OpenWA unexpected error: {exc}")
+        return False, f"Failed to send message via OpenWA: {exc}", None
+
+
+def format_outfit_display(
+    title_raw: Optional[str],
+    category_raw: Optional[str],
+    customer_name: Optional[str] = None,
+) -> str:
+    """
+    Format outfit description for WhatsApp templates.
+    Appends 'Lehenga' for categories 'Bridal', 'Reception', and 'Casual'.
+      - 'Bridal' -> 'Bridal Lehenga'
+      - 'Reception' -> 'Reception Lehenga'
+      - 'Casual' -> 'Casual Lehenga'
+    """
+    raw_cat = str(category_raw or "Bridal").strip().replace("–", "-").replace("—", "-")
+    cat_lower = raw_cat.lower()
+
+    lehenga_map = {
+        "bridal": "Bridal Lehenga",
+        "reception": "Reception Lehenga",
+        "casual": "Casual Lehenga",
+    }
+
+    category_display = lehenga_map.get(cat_lower, raw_cat)
+
+    raw_title = str(title_raw or "").strip().replace("–", "-").replace("—", "-")
+    cust_clean = str(customer_name or "").strip()
+
+    if (
+        not raw_title
+        or raw_title.startswith("Booking -")
+        or raw_title.startswith("Booking –")
+        or (cust_clean and raw_title.lower() == cust_clean.lower())
+        or raw_title.lower() == cat_lower
+        or raw_title.lower() == category_display.lower()
+    ):
+        return category_display
+
+    if "lehenga" in raw_title.lower() or "lengha" in raw_title.lower():
+        return raw_title
+
+    return f"{raw_title} ({category_display})"
 
 
 def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None) -> str:
-    """Generate a clean, aesthetic luxury formatted e-bill message."""
+    """Generate short, friendly booking confirmation message with terms (Message 1)."""
     store_name = shop_name or get_shop_name()
     customer_name = (article.get("customer_name") or "Valued Customer").strip()
     art_id = str(article.get("article_id") or "N/A").strip()
-    raw_title = str(article.get("title") or "").strip()
-    category = str(article.get("category") or "Bridal").replace("–", "-").replace("—", "-")
-    cust_clean = customer_name
-    if (
-        not raw_title
-        or raw_title.startswith("Booking –")
-        or raw_title.startswith("Booking -")
-        or (cust_clean and raw_title.lower() == cust_clean.lower())
-    ):
-        title = category
-    else:
-        title = raw_title.replace("–", "-").replace("—", "-")
-
-    item_display = title if title.lower() == category.lower() else f"{title} ({category})"
+    item_display = format_outfit_display(article.get("title"), article.get("category"), customer_name)
     pickup_date = article.get("pickup_date") or "N/A"
     return_date = article.get("return_date") or "N/A"
-    created_date = (str(article.get("created_at") or "")[:10]) or pickup_date
-    phone = article.get("customer_phone") or ""
 
     price = float(article.get("price") or 0)
     advance = float(article.get("advance_amount") or 0)
-    security = float(article.get("security_deposit") or 0)
     balance = float(
         article.get("balance_amount")
         if article.get("balance_amount") is not None
@@ -284,103 +439,47 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
     has_j = int(article.get("has_jewellery") or 0) == 1
     jewel_line = ""
     if has_j:
-        j_det = (article.get("jewellery_details") or "Full Matching Set").strip() or "Full Matching Set"
+        j_det = (article.get("jewellery_details") or "Matching Set").strip() or "Matching Set"
         j_pr = float(article.get("jewellery_price") or 0)
-        jewel_extra = f" (+Rs. {j_pr:,.0f})" if j_pr > 0 else ""
+        jewel_extra = f" (+₹{j_pr:,.0f})" if j_pr > 0 else ""
         jewel_line = f"💍 *Jewellery:* {j_det}{jewel_extra}\n"
 
     balance_line = (
-        "✅ *Balance Due:* Rs. 0 (Paid in Full)"
+        "✅ *Balance:* ₹0 (Paid in Full)"
         if balance <= 0
-        else f"⏳ *Balance Due:* Rs. {balance:,.0f}"
+        else f"⏳ *Balance Due:* ₹{balance:,.0f}"
     )
-    security_line = f"🛡 *Security Deposit:* Rs. {security:,.0f}\n" if security > 0 else ""
-
-    st = str(article.get("status") or "booked").lower()
-    if st == "picked_up":
-        stage_str = "🛍️ Picked Up (Taken by Customer)"
-    elif st == "returned":
-        stage_str = "✅ Returned (Back in Shop)"
-    else:
-        stage_str = "📌 Booked (Advance Paid)"
 
     text = (
-        f"🧾 *E-BILL & BOOKING CONFIRMATION*\n"
+        f"✨ *BOOKING CONFIRMED* ✨\n"
         f"*{store_name.upper()}*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 *Customer:* {customer_name}\n"
-        f"📱 *Mobile:* {phone}\n"
-        f"🗓 *Booking ID:* #{art_id} | *Date:* {created_date}\n"
-        f"🏷 *Stage:* {stage_str}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Dear *{customer_name}*, thank you for booking with us!\n\n"
         f"👗 *Outfit:* {item_display}\n"
         f"{jewel_line}"
+        f"🗓 *Booking ID:* #{art_id}\n"
         f"📅 *Pickup Date:* {pickup_date}\n"
         f"🔄 *Return Date:* {return_date}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 *Total Rent:* Rs. {price:,.0f}\n"
-        f"💵 *Advance Paid:* Rs. {advance:,.0f}\n"
-        f"{security_line}"
+        f"💰 *Rent:* ₹{price:,.0f} | *Advance:* ₹{advance:,.0f}\n"
         f"{balance_line}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📋 *TERMS & CONDITIONS:*\n"
-        f"1. No cancellation, refund, or adjustment once booking is confirmed under any condition.\n"
-        f"2. Outfit must be returned on or before the Return Date, else a penalty of Rs. 300 per day will apply.\n"
+        f"📌 *Please Note:*\n"
+        f"• No alterations after booking.\n"
+        f"• Please return on or before {return_date}. Late returns will be charged ₹300/day.\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"🙏 _Thank you for choosing {store_name}!_\n"
-        f"📍 _Kindly present this e-receipt or Booking #{art_id} at pickup._"
+        f"📞 *Contact:* 9541004204\n"
+        f"🙏 *Thank you!* See you on pickup day."
     )
     return text
 
 
-def get_whatsapp_url(phone_raw: Optional[str], text: str) -> Optional[str]:
-    """Build a direct click-to-chat WhatsApp wa.me URL."""
-    clean_phone = format_phone_number(phone_raw)
-    if not clean_phone:
-        return None
-    encoded_text = urllib.parse.quote(text)
-    return f"https://wa.me/{clean_phone}?text={encoded_text}"
-
-
-def get_whatsapp_app_url(phone_raw: Optional[str], text: str) -> Optional[str]:
-    """Build a native Windows WhatsApp Desktop URI (whatsapp://send)."""
-    clean_phone = format_phone_number(phone_raw)
-    if not clean_phone:
-        return None
-    encoded_text = urllib.parse.quote(text)
-    return f"whatsapp://send?phone={clean_phone}&text={encoded_text}"
-
-
-async def send_booking_ebill_task(article: Dict[str, Any]) -> Tuple[bool, str]:
-    """
-    Background hook stub for backwards compatibility.
-    In direct mode, messages are dispatched directly via client click-to-chat.
-    """
-    logger.info(f"[WHATSAPP] Direct WhatsApp mode active for article {article.get('article_id')}")
-    return True, "Direct WhatsApp mode active"
-
-
 def generate_pickup_reminder_text(article: Dict[str, Any], shop_name: Optional[str] = None) -> str:
-    """Generate a clean, professional pickup reminder message sent 1 day before pickup."""
+    """Generate short, friendly pickup reminder message sent 1 day before pickup (Message 2)."""
     store_name = shop_name or get_shop_name()
     customer_name = (article.get("customer_name") or "Valued Customer").strip()
     art_id = str(article.get("article_id") or "N/A").strip()
-    raw_title = str(article.get("title") or "").strip()
-    category = str(article.get("category") or "Bridal").replace("–", "-").replace("—", "-")
-    cust_clean = customer_name
-    if (
-        not raw_title
-        or raw_title.startswith("Booking –")
-        or raw_title.startswith("Booking -")
-        or (cust_clean and raw_title.lower() == cust_clean.lower())
-    ):
-        title = category
-    else:
-        title = raw_title.replace("–", "-").replace("—", "-")
-
-    item_display = title if title.lower() == category.lower() else f"{title} ({category})"
+    item_display = format_outfit_display(article.get("title"), article.get("category"), customer_name)
     pickup_date = article.get("pickup_date") or "N/A"
-    return_date = article.get("return_date") or "N/A"
 
     price = float(article.get("price") or 0)
     advance = float(article.get("advance_amount") or 0)
@@ -391,36 +490,61 @@ def generate_pickup_reminder_text(article: Dict[str, Any], shop_name: Optional[s
     )
 
     balance_line = (
-        "✅ Rs. 0 (Fully Paid)"
+        "✅ *Balance:* ₹0 (Paid in Full)"
         if balance <= 0
-        else f"⏳ Rs. {balance:,.0f}"
+        else f"💰 *Balance Due:* ₹{balance:,.0f}"
     )
 
     text = (
-        f"👗 *OUTFIT PICKUP REMINDER*\n"
+        f"🌸 *PICKUP REMINDER* 🌸\n"
         f"*{store_name.upper()}*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Dear *{customer_name}*,\n\n"
-        f"This is a friendly reminder that your bridal outfit is scheduled for pickup *TOMORROW*:\n\n"
+        f"Your outfit is ready for pickup *TOMORROW*!\n\n"
         f"👗 *Outfit:* {item_display}\n"
         f"🗓 *Booking ID:* #{art_id}\n"
         f"📅 *Pickup Date:* {pickup_date}\n"
-        f"🔄 *Return Date:* {return_date}\n"
-        f"💰 *Remaining Balance:* {balance_line}\n"
+        f"{balance_line}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📍 *Kindly present Booking #{art_id} or your e-receipt at the counter.*\n"
-        f"🙏 _Thank you for choosing {store_name}! We look forward to seeing you._"
+        f"📞 *Contact:* 9541004204\n"
+        f"🙏 *Thank you!* We look forward to seeing you tomorrow."
     )
     return text
 
 
-def send_pickup_reminder_for_article(
+def generate_return_reminder_text(article: Dict[str, Any], shop_name: Optional[str] = None) -> str:
+    """Generate short, friendly return reminder message sent 1 day before return date (Message 3)."""
+    store_name = shop_name or get_shop_name()
+    customer_name = (article.get("customer_name") or "Valued Customer").strip()
+    art_id = str(article.get("article_id") or "N/A").strip()
+    item_display = format_outfit_display(article.get("title"), article.get("category"), customer_name)
+    return_date = article.get("return_date") or "N/A"
+
+    text = (
+        f"💫 *RETURN REMINDER* 💫\n"
+        f"*{store_name.upper()}*\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Dear *{customer_name}*,\n\n"
+        f"We hope you loved your outfit! A quick reminder that your return is scheduled for *TOMORROW*.\n\n"
+        f"👗 *Outfit:* {item_display}\n"
+        f"🗓 *Booking ID:* #{art_id}\n"
+        f"🔄 *Return Date:* {return_date}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 *Please Note:*\n"
+        f"Kindly return on or before tomorrow to avoid late charges of *₹300/day*.\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📞 *Contact:* 9541004204\n"
+        f"🙏 *Thank you for choosing us!*"
+    )
+    return text
+
+
+def send_booking_ebill(
     article_id: int,
     phone_override: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
-    Sends a pickup reminder message for a specific article via Meta WhatsApp Cloud API
-    (or prepares direct wa.me fallback) and marks pickup_reminder_sent = 1.
+    Finds article and dispatches booking confirmation e-bill with outfit photo directly via OpenWA.
     """
     db = get_db()
     row = db.execute("SELECT * FROM articles WHERE id = ?", (article_id,)).fetchone()
@@ -428,7 +552,32 @@ def send_pickup_reminder_for_article(
         return False, "Article not found", None
 
     article = dict(row)
-    target_phone = phone_override or article.get("customer_phone")
+    target_phone = phone_override or article.get("customer_phone") or article.get("customer_alt_phone")
+    if not target_phone:
+        return False, "No customer phone number found for this booking.", None
+
+    shop_title = get_shop_name()
+    ebill_text = generate_ebill_text(article, shop_title)
+    image_path = article.get("image_path")
+
+    return send_openwa_message(target_phone, ebill_text, image_path)
+
+
+def send_pickup_reminder_for_article(
+    article_id: int,
+    phone_override: Optional[str] = None,
+) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """
+    Sends a pickup reminder message for a specific article via OpenWA
+    and marks pickup_reminder_sent = 1.
+    """
+    db = get_db()
+    row = db.execute("SELECT * FROM articles WHERE id = ?", (article_id,)).fetchone()
+    if not row:
+        return False, "Article not found", None
+
+    article = dict(row)
+    target_phone = phone_override or article.get("customer_phone") or article.get("customer_alt_phone")
     if not target_phone:
         return False, "No customer phone number found for this booking.", None
 
@@ -438,67 +587,52 @@ def send_pickup_reminder_for_article(
 
     shop_title = get_shop_name()
     reminder_text = generate_pickup_reminder_text(article, shop_title)
-    wa_url = get_whatsapp_url(target_phone, reminder_text)
-    wa_app_url = get_whatsapp_app_url(target_phone, reminder_text)
 
-    creds = get_whatsapp_meta_credentials()
-    mode = creds.get("mode", "direct")
-    is_meta = bool(creds.get("phone_number_id") and creds.get("access_token") and mode == "meta")
+    success, msg, api_res = send_openwa_message(target_phone, reminder_text)
+    if success:
+        db.execute("UPDATE articles SET pickup_reminder_sent = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (article_id,))
+        db.commit()
+        return True, f"Pickup reminder sent successfully to +{clean_phone} via OpenWA!", api_res
+    return False, msg, api_res
 
-    extra_data = {
-        "article_id": article_id,
-        "clean_phone": clean_phone,
-        "reminder_text": reminder_text,
-        "whatsapp_url": wa_url,
-        "whatsapp_app_url": wa_app_url,
-    }
 
-    if is_meta:
-        reminder_template = creds.get("reminder_template_name") or ""
-        cust_name = (article.get("customer_name") or "Valued Customer").strip()
-        art_id_str = str(article.get("article_id") or "").strip()
-        outfit_name = str(article.get("title") or article.get("category") or "Bridal Outfit").strip()
-        pickup_date = str(article.get("pickup_date") or "").strip()
-        price = float(article.get("price") or 0)
-        adv = float(article.get("advance_amount") or 0)
-        bal = float(article.get("balance_amount") if article.get("balance_amount") is not None else max(0.0, price - adv))
-        bal_str = f"Rs. {bal:,.0f}" if bal > 0 else "Rs. 0 (Paid)"
+def send_return_reminder_for_article(
+    article_id: int,
+    phone_override: Optional[str] = None,
+) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """
+    Sends a return reminder message for a specific article via OpenWA
+    and marks return_reminder_sent = 1.
+    """
+    db = get_db()
+    row = db.execute("SELECT * FROM articles WHERE id = ?", (article_id,)).fetchone()
+    if not row:
+        return False, "Article not found", None
 
-        template_params = [
-            cust_name,
-            shop_title,
-            outfit_name,
-            art_id_str,
-            pickup_date,
-            bal_str,
-        ] if reminder_template else None
+    article = dict(row)
+    target_phone = phone_override or article.get("customer_phone") or article.get("customer_alt_phone")
+    if not target_phone:
+        return False, "No customer phone number found for this booking.", None
 
-        success, msg, api_res = send_meta_whatsapp_message(
-            target_phone,
-            reminder_text,
-            template_name=reminder_template or None,
-            template_params=template_params,
-        )
+    clean_phone = format_phone_number(target_phone)
+    if not clean_phone:
+        return False, "Invalid recipient phone number.", None
 
-        if success:
-            db.execute("UPDATE articles SET pickup_reminder_sent = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (article_id,))
-            db.commit()
-            extra_data["api_response"] = api_res
-            return True, f"Pickup reminder sent successfully via Meta WhatsApp API (Booking #{art_id_str})", extra_data
-        else:
-            extra_data["api_response"] = api_res
-            return False, msg, extra_data
+    shop_title = get_shop_name()
+    reminder_text = generate_return_reminder_text(article, shop_title)
 
-    # Direct wa.me mode
-    db.execute("UPDATE articles SET pickup_reminder_sent = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (article_id,))
-    db.commit()
-    return True, "WhatsApp reminder link ready", extra_data
+    success, msg, api_res = send_openwa_message(target_phone, reminder_text)
+    if success:
+        db.execute("UPDATE articles SET return_reminder_sent = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (article_id,))
+        db.commit()
+        return True, f"Return reminder sent successfully to +{clean_phone} via OpenWA!", api_res
+    return False, msg, api_res
 
 
 def dispatch_due_pickup_reminders() -> Dict[str, Any]:
     """
     Finds all active bookings where pickup_date is TOMORROW (1 day before pickup)
-    and where reminder has not yet been sent. Dispatches reminders automatically.
+    and where reminder has not yet been sent. Dispatches reminders automatically via OpenWA.
     """
     import datetime
     t_dt = datetime.date.today() + datetime.timedelta(days=1)
@@ -509,7 +643,7 @@ def dispatch_due_pickup_reminders() -> Dict[str, Any]:
     db = get_db()
     rows = db.execute(
         """
-        SELECT id, article_id, customer_name, customer_phone, pickup_date, status, pickup_reminder_sent
+        SELECT id, article_id, customer_name, customer_phone, customer_alt_phone, pickup_date, status, pickup_reminder_sent
         FROM articles
         WHERE status = 'booked'
           AND (pickup_reminder_sent IS NULL OR pickup_reminder_sent = 0)
@@ -542,3 +676,48 @@ def dispatch_due_pickup_reminders() -> Dict[str, Any]:
     }
 
 
+def dispatch_due_return_reminders() -> Dict[str, Any]:
+    """
+    Finds all active bookings where return_date is TOMORROW (1 day before return)
+    and where return reminder has not yet been sent. Dispatches reminders automatically via OpenWA.
+    """
+    import datetime
+    t_dt = datetime.date.today() + datetime.timedelta(days=1)
+    tomorrow_iso = t_dt.isoformat()
+    tomorrow_slash = t_dt.strftime("%d/%m/%Y")
+    tomorrow_dash = t_dt.strftime("%d-%m-%Y")
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT id, article_id, customer_name, customer_phone, customer_alt_phone, return_date, status, return_reminder_sent
+        FROM articles
+        WHERE status IN ('booked', 'picked_up')
+          AND (return_reminder_sent IS NULL OR return_reminder_sent = 0)
+          AND (return_date = ? OR return_date = ? OR return_date = ? OR return_date LIKE ?)
+        """,
+        (tomorrow_iso, tomorrow_slash, tomorrow_dash, f"{tomorrow_iso}%")
+    ).fetchall()
+
+    results = []
+    sent_count = 0
+    fail_count = 0
+
+    for r in rows:
+        art = dict(r)
+        success, msg, extra = send_return_reminder_for_article(art["id"])
+        if success:
+            sent_count += 1
+            results.append({"article_id": art["article_id"], "status": "sent", "message": msg})
+        else:
+            fail_count += 1
+            results.append({"article_id": art["article_id"], "status": "failed", "error": msg})
+
+    return {
+        "success": True,
+        "tomorrow_date": tomorrow_iso,
+        "total_due": len(rows),
+        "sent_count": sent_count,
+        "fail_count": fail_count,
+        "results": results,
+    }

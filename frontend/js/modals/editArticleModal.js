@@ -251,7 +251,7 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
         </div>
 
         <!-- Customer Information -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
           <div>
             <label class="input-label" for="edit-cust-name">Customer Full Name</label>
             <input
@@ -270,6 +270,18 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
               class="input-field font-mono"
               value="${escapeHtml(article.customer_phone || '')}"
               placeholder="e.g. 9876543210"
+              autocomplete="tel"
+            />
+          </div>
+          <div>
+            <label class="input-label" for="edit-cust-alt-phone">Alternative No. (Optional)</label>
+            <input
+              type="tel"
+              id="edit-cust-alt-phone"
+              class="input-field font-mono"
+              value="${escapeHtml(article.customer_alt_phone || '')}"
+              placeholder="e.g. 9876512345"
+              autocomplete="tel"
             />
           </div>
         </div>
@@ -510,6 +522,7 @@ export function openEditArticleModal(article, { onUpdate } = {}) {
       jewellery_price: jewelPriceVal,
       customer_name: modalEl.querySelector('#edit-cust-name').value.trim(),
       customer_phone: modalEl.querySelector('#edit-cust-phone').value.trim(),
+      customer_alt_phone: modalEl.querySelector('#edit-cust-alt-phone') ? modalEl.querySelector('#edit-cust-alt-phone').value.trim() : '',
       customer_address: modalEl.querySelector('#edit-cust-addr').value.trim(),
       pickup_date: modalEl.querySelector('#edit-pickup-date').value || null,
       return_date: modalEl.querySelector('#edit-return-date').value || null,

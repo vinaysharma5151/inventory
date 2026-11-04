@@ -156,15 +156,19 @@ export function openAddArticleModal(onCreated, shopName = 'Bridal Studio') {
           </div>
         </div>
 
-        <!-- Customer Name & Phone -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- Customer Name, Phone & Alt Phone -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
           <div>
             <label class="input-label" for="add-customer-name">Customer Name</label>
             <input type="text" id="add-customer-name" class="input-field" placeholder="e.g. Simran Kaur" />
           </div>
           <div>
             <label class="input-label" for="add-customer-phone">Customer Phone</label>
-            <input type="tel" id="add-customer-phone" class="input-field font-mono" placeholder="e.g. 9876543210" />
+            <input type="tel" id="add-customer-phone" class="input-field font-mono" placeholder="e.g. 9876543210" autocomplete="tel" />
+          </div>
+          <div>
+            <label class="input-label" for="add-customer-alt-phone">Alternative No. (Optional)</label>
+            <input type="tel" id="add-customer-alt-phone" class="input-field font-mono" placeholder="e.g. 9876512345" autocomplete="tel" />
           </div>
         </div>
 
@@ -345,6 +349,8 @@ export function openAddArticleModal(onCreated, shopName = 'Bridal Studio') {
     formData.append('jewellery_price', jewelPrice);
     formData.append('customer_name', modalEl.querySelector('#add-customer-name').value.trim());
     formData.append('customer_phone', modalEl.querySelector('#add-customer-phone').value.trim());
+    const addAltPhoneEl = modalEl.querySelector('#add-customer-alt-phone');
+    formData.append('customer_alt_phone', addAltPhoneEl ? addAltPhoneEl.value.trim() : '');
     formData.append('pickup_date', modalEl.querySelector('#add-pickup-date').value);
     formData.append('return_date', modalEl.querySelector('#add-return-date').value);
     formData.append('notes', modalEl.querySelector('#add-notes').value.trim());
@@ -359,9 +365,11 @@ export function openAddArticleModal(onCreated, shopName = 'Bridal Studio') {
         closeModal();
         if (onCreated) onCreated(res.article);
 
-        // Instant post-booking WhatsApp e-bill dispatch prompt
+        // WhatsApp confirmation status
         const custPhone = (res.article?.customer_phone || '').trim();
-        if (custPhone) {
+        if (res.whatsapp_dispatch && res.whatsapp_dispatch.success) {
+          showToast(`✓ Article ${finalId} booked & WhatsApp confirmation sent with photo!`, 'success', 4000);
+        } else if (custPhone) {
           openWhatsAppBillModal(res.article, shopName);
         }
       } else {

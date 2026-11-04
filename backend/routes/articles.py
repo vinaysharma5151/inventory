@@ -14,8 +14,12 @@ WHY:
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 import uuid
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
@@ -31,7 +35,6 @@ from backend.services.auth import (
 from backend.services.backup_service import update_inventory_csv_backup
 from backend.services.export_service import generate_inventory_csv_response
 from backend.services.image_service import save_article_image
-from backend.services.thermal_printer import get_active_printer, print_article_thermal
 from backend.sse import broadcast
 
 router = APIRouter()
@@ -75,9 +78,10 @@ def list_articles(
             title LIKE ? OR
             customer_name LIKE ? OR
             customer_phone LIKE ? OR
+            customer_alt_phone LIKE ? OR
             salesman_name LIKE ?
         )"""
-        params.extend([search_pattern] * 5)
+        params.extend([search_pattern] * 6)
 
     if category and category.lower() != "all":
         query += " AND category = ?"
@@ -88,8 +92,12 @@ def list_articles(
         params.append(salesman)
 
     if stage and stage.lower() != "all":
-        query += " AND status = ?"
-        params.append(stage.lower())
+        st_clean = stage.lower().strip()
+        if st_clean in ("not_returned", "overdue"):
+            query += " AND status != 'returned' AND return_date IS NOT NULL AND TRIM(return_date) != '' AND TRIM(return_date) <= date('now', 'localtime')"
+        else:
+            query += " AND status = ?"
+            params.append(st_clean)
 
     query += " ORDER BY created_at DESC"
     rows = db.execute(query, params).fetchall()
@@ -106,6 +114,62 @@ def get_next_id(current_user: dict = Depends(require_staff_or_owner)):
     db = get_db()
     next_id = generate_article_id(db)
     return {"success": True, "next_id": next_id}
+
+
+@router.get("/articles/by-code/{code}")
+def get_article_by_code(
+    code: str,
+    current_user: dict = Depends(require_staff_or_owner),
+):
+    """
+    Fetch a single article by its article code (e.g. '0001', 'LEH-01').
+    Supports exact match, case-insensitive match, and numeric zero-padded sequence search.
+    """
+    clean_code = (code or "").strip().lstrip("#").strip()
+    if not clean_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Article code cannot be empty.",
+        )
+
+    try:
+        db = get_db()
+        # 1. Direct or case-insensitive match on article_id
+        row = db.execute(
+            "SELECT * FROM articles WHERE UPPER(TRIM(article_id)) = UPPER(?)",
+            (clean_code,),
+        ).fetchone()
+
+        # 2. If not found and input is numeric (e.g. '1'), try 4-digit zero-padding (e.g. '0001')
+        if not row and clean_code.isdigit() and len(clean_code) < 4:
+            padded = clean_code.zfill(4)
+            row = db.execute(
+                "SELECT * FROM articles WHERE UPPER(TRIM(article_id)) = UPPER(?)",
+                (padded,),
+            ).fetchone()
+
+        # 3. If not found and input is numeric, also check primary key id
+        if not row and clean_code.isdigit():
+            row = db.execute(
+                "SELECT * FROM articles WHERE id = ?",
+                (int(clean_code),),
+            ).fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Article '{clean_code}' not found.",
+            )
+
+        return {"success": True, "article": article_row_to_dict(row)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Error fetching article by code '{clean_code}': {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve article details.",
+        )
 
 
 @router.get("/articles/{article_id}")
@@ -132,6 +196,7 @@ async def create_article(
     source:           Optional[str]   = Form("phone"),
     customer_name:    Optional[str]   = Form(None),
     customer_phone:   Optional[str]   = Form(None),
+    customer_alt_phone: Optional[str] = Form(None),
     customer_address: Optional[str]   = Form(None),
     pickup_date:      Optional[str]   = Form(None),
     booking_date:     Optional[str]   = Form(None),
@@ -199,10 +264,10 @@ async def create_article(
         """INSERT INTO articles
            (article_id, title, category, price, security_deposit,
             advance_amount, balance_amount, notes,
-            image_path, source, customer_name, customer_phone, customer_address,
+            image_path, source, customer_name, customer_phone, customer_alt_phone, customer_address,
             pickup_date, booking_date, return_date, salesman_name,
             status, has_jewellery, jewellery_details, jewellery_price)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             final_id,
             final_title,
@@ -216,6 +281,7 @@ async def create_article(
             source or "phone",
             customer_name or None,
             customer_phone or None,
+            customer_alt_phone or None,
             customer_address or None,
             pickup_date or None,
             booking_date or None,
@@ -245,10 +311,27 @@ async def create_article(
 
     await broadcast("NEW_ARTICLE", article)
 
+    # Auto-dispatch WhatsApp booking confirmation with photo to customer
+    wa_dispatch = None
+    target_cust_phone = (customer_phone or customer_alt_phone or "").strip()
+    if target_cust_phone and len(re.sub(r"\D", "", target_cust_phone)) >= 10:
+        try:
+            from backend.services.whatsapp import send_booking_ebill
+            wa_ok, wa_msg, wa_details = send_booking_ebill(new_id)
+            wa_dispatch = {"success": wa_ok, "message": wa_msg}
+            if wa_ok:
+                logger.info(f"[ARTICLE_CREATE] Auto-dispatched WhatsApp confirmation with photo for article #{final_id}")
+            else:
+                logger.warning(f"[ARTICLE_CREATE] Auto-dispatch WhatsApp notice: {wa_msg}")
+        except Exception as wa_err:
+            logger.warning(f"[ARTICLE_CREATE] Auto-dispatch WhatsApp isolated error: {wa_err}")
+            wa_dispatch = {"success": False, "error": str(wa_err)}
+
     return {
         "success": True,
         "message": "Article and photo saved successfully to showroom database!",
         "article": article,
+        "whatsapp_dispatch": wa_dispatch,
     }
 
 
@@ -273,7 +356,7 @@ async def update_article(
     allowed = {
         "article_id", "title", "category", "price", "security_deposit",
         "advance_amount", "balance_amount", "notes",
-        "customer_name", "customer_phone", "customer_address", "pickup_date", "booking_date",
+        "customer_name", "customer_phone", "customer_alt_phone", "customer_address", "pickup_date", "booking_date",
         "return_date", "salesman_name", "status",
         "has_jewellery", "jewellery_details", "jewellery_price",
     }
@@ -627,48 +710,4 @@ def export_csv(current_user: dict = Depends(require_owner)):
         pass
     return generate_inventory_csv_response()
 
-
-@router.post("/articles/{article_id}/print-thermal")
-def print_article_direct_thermal(
-    article_id: int,
-    request: Request,
-    payload: dict = None,
-    current_user: dict = Depends(require_staff_or_owner),
-):
-    """
-    Direct 1-click silent printing to PIXEL DP82 thermal printer via Windows Spooler.
-    Formats exact ESC/POS layout, 6-line cutter feed, and auto-cut.
-    """
-    article = _get_or_404(article_id)
-
-    db = get_db()
-    shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
-
-    target_printer = None
-    if payload and payload.get("printer_name"):
-        target_printer = payload.get("printer_name").strip()
-
-    ok, msg = print_article_thermal(article, shop_name, target_printer)
-    if not ok:
-        raise HTTPException(status_code=500, detail=msg)
-
-    active_p = target_printer or get_active_printer() or "PIXEL DP82"
-
-    ip = get_client_ip(request)
-    log_audit_event(
-        db,
-        action="PRINT_THERMAL_BILL",
-        username=current_user.get("username"),
-        role=current_user.get("role"),
-        target_id=str(article_id),
-        details=f"Direct thermal bill printed for article {article.get('article_id')} on {active_p}",
-        ip_address=ip,
-    )
-
-    return {
-        "success": True,
-        "printer": active_p,
-        "message": msg,
-    }
 

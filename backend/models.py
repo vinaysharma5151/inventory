@@ -25,6 +25,7 @@ class ArticleUpdate(BaseModel):
     notes:            Optional[str]   = None
     customer_name:    Optional[str]   = None
     customer_phone:   Optional[str]   = None
+    customer_alt_phone: Optional[str] = None
     customer_address: Optional[str]   = None
     pickup_date:      Optional[str]   = None
     booking_date:     Optional[str]   = None
@@ -69,7 +70,7 @@ class ArticleUpdate(BaseModel):
             return 0.0
         return None
 
-    @field_validator("customer_phone", mode="before")
+    @field_validator("customer_phone", "customer_alt_phone", mode="before")
     @classmethod
     def validate_phone(cls, v):
         """Strip spaces and dashes from phone numbers, allow empty or digits."""

@@ -36,6 +36,21 @@ export const articlesApi = {
   },
 
   /**
+   * Fetches full details of a single article by its unique article code (e.g. "0001").
+   * @param {string} code - Formatted article code
+   * @returns {Promise<{success: boolean, article: object}>}
+   */
+  async getArticleByCode(code) {
+    const clean = encodeURIComponent((code || '').trim());
+    const res = await request(`${API_BASE}/articles/by-code/${clean}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Article '${code}' not found.`);
+    }
+    return res.json();
+  },
+
+  /**
    * Generates the next sequential formatted article ID (e.g. "0001", "0002").
    * @returns {Promise<{success: boolean, next_id: string}>}
    */
@@ -200,24 +215,5 @@ export const articlesApi = {
       throw new Error(err.detail || 'Failed to delete article');
     }
     return res.json();
-  },
-
-  /**
-   * Sends raw ESC/POS bill directly to Windows Print Spooler (PIXEL DP82).
-   * @param {number|string} id - Article database ID
-   * @param {string} [printerName] - Optional target printer name override
-   * @returns {Promise<{success: boolean, printer: string, message: string}>}
-   */
-  async printThermalDirect(id, printerName = '') {
-    const res = await request(`${API_BASE}/articles/${id}/print-thermal`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ printer_name: printerName || '' })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
-      throw new Error(data.detail || 'Direct thermal print failed');
-    }
-    return data;
   }
 };

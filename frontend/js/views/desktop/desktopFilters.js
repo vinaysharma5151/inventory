@@ -46,17 +46,25 @@ export function filterArticles(articles, state) {
       const matchId = (item.article_id || '').toLowerCase().includes(q);
       const matchTitle = (item.title || '').toLowerCase().includes(q);
       const matchCustomer = (item.customer_name || '').toLowerCase().includes(q);
-      const matchPhone = (item.customer_phone || '').toLowerCase().includes(q);
+      const matchPhone = (item.customer_phone || '').toLowerCase().includes(q) || (item.customer_alt_phone || '').toLowerCase().includes(q);
       const matchJewellery = Boolean(item.has_jewellery && (item.jewellery_details || 'jewellery').toLowerCase().includes(q));
       if (!matchId && !matchTitle && !matchCustomer && !matchPhone && !matchJewellery) {
         return false;
       }
     }
 
-    // 2. Stage Filter (1: Booked, 2: Picked Up, 3: Returned)
+    // 2. Stage Filter (1: Booked, 2: Picked Up, 3: Returned, Not Returned on Date)
     if (stageFilter && stageFilter !== 'all') {
       const itemStage = (item.status || 'booked').toLowerCase();
-      if (itemStage !== stageFilter.toLowerCase()) {
+      if (stageFilter === 'not_returned' || stageFilter === 'overdue') {
+        const today = getTodayISO(0);
+        const hasReturnDate = Boolean(item.return_date && item.return_date.trim());
+        const isNotReturned = itemStage !== 'returned';
+        const isPastOrToday = hasReturnDate && item.return_date.trim() <= today;
+        if (!isNotReturned || !isPastOrToday) {
+          return false;
+        }
+      } else if (itemStage !== stageFilter.toLowerCase()) {
         return false;
       }
     }

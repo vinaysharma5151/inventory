@@ -11,6 +11,7 @@ Security Implementations:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
@@ -44,21 +45,60 @@ if not logger.handlers:
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: database schema init
+# Lifespan: database schema init & background reminder scheduler
 # ---------------------------------------------------------------------------
+async def _reminder_scheduler_loop():
+    """Background worker: scans and auto-dispatches pickup & return reminders on startup and every 30 minutes."""
+    # Warm-up scan: 10s after boot, verify gateway and dispatch any pending reminders
+    await asyncio.sleep(10)
+    try:
+        from backend.services.whatsapp import dispatch_due_pickup_reminders, dispatch_due_return_reminders
+        p_res = dispatch_due_pickup_reminders()
+        r_res = dispatch_due_return_reminders()
+        p_sent = p_res.get("sent_count", 0)
+        r_sent = r_res.get("sent_count", 0)
+        if p_sent > 0 or r_sent > 0:
+            logger.info(f"[WHATSAPP SCHEDULER] Warmup scan auto-dispatched {p_sent} pickup and {r_sent} return reminder(s).")
+    except Exception as e:
+        logger.warning(f"[WHATSAPP SCHEDULER] Error in warmup reminder check: {e}")
+
+    while True:
+        try:
+            await asyncio.sleep(1800)
+            from backend.services.whatsapp import dispatch_due_pickup_reminders, dispatch_due_return_reminders
+            p_res = dispatch_due_pickup_reminders()
+            r_res = dispatch_due_return_reminders()
+            p_sent = p_res.get("sent_count", 0)
+            r_sent = r_res.get("sent_count", 0)
+            if p_sent > 0 or r_sent > 0:
+                logger.info(f"[WHATSAPP SCHEDULER] Auto-dispatched {p_sent} pickup and {r_sent} return reminder(s).")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"[WHATSAPP SCHEDULER] Error in reminder scheduler loop: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing database and application services...")
     init_db()
     try:
-        from backend.services.whatsapp import dispatch_due_pickup_reminders
-        res = dispatch_due_pickup_reminders()
-        if res.get("sent_count", 0) > 0:
-            logger.info(f"[WHATSAPP] Sent {res['sent_count']} pickup reminder(s) on startup.")
+        from backend.services.whatsapp import dispatch_due_pickup_reminders, dispatch_due_return_reminders
+        p_res = dispatch_due_pickup_reminders()
+        r_res = dispatch_due_return_reminders()
+        p_sent = p_res.get("sent_count", 0)
+        r_sent = r_res.get("sent_count", 0)
+        if p_sent > 0 or r_sent > 0:
+            logger.info(f"[WHATSAPP] Sent {p_sent} pickup and {r_sent} return reminder(s) on startup.")
     except Exception as e:
         logger.warning(f"[WHATSAPP] Startup reminder check notice: {e}")
+
+    scheduler_task = asyncio.create_task(_reminder_scheduler_loop())
     logger.info("Application ready.")
-    yield
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
 
 
 # ---------------------------------------------------------------------------

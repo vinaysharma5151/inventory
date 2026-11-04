@@ -36,7 +36,7 @@ else:
 APP_ENV = "prod"
 IS_DEV = False
 
-APP_VERSION = "2.2.1"
+APP_VERSION = "2.3.0"
 DB_PATH = DATA_DIR / "lehenga_inventory.sqlite"
 UPLOADS_DIR = DATA_DIR / "uploads"
 LOGS_DIR = DATA_DIR / "logs"

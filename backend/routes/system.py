@@ -32,17 +32,6 @@ from backend.services.backup_service import (
 )
 from backend.services.licensing import check_license, register_shop_in_supabase
 from backend.services.qr_service import generate_qr_data_url
-from backend.services.thermal_printer import (
-    build_test_receipt,
-    get_active_printer,
-    get_installed_printers,
-    send_raw_escpos_to_printer,
-    set_active_printer,
-)
-from backend.services.update_service import (
-    check_github_for_updates,
-    trigger_update_pipeline,
-)
 
 router = APIRouter()
 
@@ -175,6 +164,9 @@ def setup_status():
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
     shop_name = shop_row["value"] if shop_row and shop_row["value"] else ""
 
+    tagline_row = db.execute("SELECT value FROM settings WHERE key = 'shop_tagline'").fetchone()
+    shop_tagline = tagline_row["value"] if tagline_row and tagline_row["value"] else "LUXURY BRIDAL ATELIER & STUDIO INVENTORY"
+
     logo_row = db.execute("SELECT value FROM settings WHERE key = 'shop_logo_url'").fetchone()
     logo_url = logo_row["value"] if logo_row and logo_row["value"] else "/assets/logo.png"
 
@@ -189,6 +181,7 @@ def setup_status():
         "success": True,
         "is_completed": is_completed,
         "shop_name": shop_name,
+        "shop_tagline": shop_tagline,
         "logo_url": logo_url,
     }
 
@@ -202,6 +195,9 @@ def get_public_branding():
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
     shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
 
+    tagline_row = db.execute("SELECT value FROM settings WHERE key = 'shop_tagline'").fetchone()
+    shop_tagline = tagline_row["value"] if tagline_row and tagline_row["value"] else "LUXURY BRIDAL ATELIER & STUDIO INVENTORY"
+
     logo_row = db.execute("SELECT value FROM settings WHERE key = 'shop_logo_url'").fetchone()
     logo_url = logo_row["value"] if logo_row and logo_row["value"] else "/assets/logo.png"
 
@@ -214,6 +210,118 @@ def get_public_branding():
     return {
         "success": True,
         "shop_name": shop_name,
+        "shop_tagline": shop_tagline,
+        "logo_url": logo_url,
+    }
+
+
+@router.post("/branding")
+async def update_branding(
+    request: Request,
+    current_user: dict = Depends(require_owner),
+):
+    """
+    Update boutique branding: shop name, tagline, and optional logo image.
+    Supports multipart/form-data with logo file upload OR JSON body.
+    """
+    import base64
+    import re as _re
+    import time
+    from backend.config import UPLOADS_DIR
+
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        shop_name = (form.get("shop_name") or "").strip()
+        shop_tagline = (form.get("shop_tagline") or "").strip()
+        logo_file = form.get("logo")
+        logo_b64 = form.get("logo_base64")
+    else:
+        payload = await request.json()
+        shop_name = (payload.get("shop_name") or "").strip()
+        shop_tagline = (payload.get("shop_tagline") or "").strip()
+        logo_file = None
+        logo_b64 = payload.get("logo_base64")
+
+    db = get_db()
+    db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+
+    if shop_name:
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_name', ?)",
+            (shop_name,),
+        )
+
+    if shop_tagline is not None:
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_tagline', ?)",
+            (shop_tagline,),
+        )
+
+    logo_updated = False
+    try:
+        logo_path = UPLOADS_DIR / "shop_logo.png"
+        if logo_file and hasattr(logo_file, "read"):
+            contents = await logo_file.read()
+            if contents:
+                logo_path.write_bytes(contents)
+                logo_updated = True
+        elif logo_b64 and str(logo_b64).strip():
+            b64_data = _re.sub(r"^data:[^;]+;base64,", "", str(logo_b64))
+            img_bytes = base64.b64decode(b64_data)
+            logo_path.write_bytes(img_bytes)
+            logo_updated = True
+    except Exception as logo_err:
+        import logging
+        logging.getLogger("system").warning(f"[BRANDING] Logo update failed: {logo_err}")
+
+    if logo_updated:
+        ts = int(time.time())
+        logo_url = f"/uploads/shop_logo.png?t={ts}"
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_logo_url', ?)",
+            (logo_url,),
+        )
+    else:
+        logo_row = db.execute("SELECT value FROM settings WHERE key = 'shop_logo_url'").fetchone()
+        logo_url = logo_row["value"] if logo_row and logo_row["value"] else "/assets/logo.png"
+        if logo_url.startswith("/uploads/"):
+            raw_name = logo_url.split("?")[0].replace("/uploads/", "")
+            logo_file_check = UPLOADS_DIR / raw_name
+            if logo_file_check.exists():
+                logo_url = f"/uploads/{raw_name}?t={int(logo_file_check.stat().st_mtime)}"
+
+    db.commit()
+
+    active_name_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
+    final_name = active_name_row["value"] if active_name_row else (shop_name or "Bridal Studio")
+
+    active_tag_row = db.execute("SELECT value FROM settings WHERE key = 'shop_tagline'").fetchone()
+    final_tagline = active_tag_row["value"] if active_tag_row else (shop_tagline or "LUXURY BRIDAL ATELIER & STUDIO INVENTORY")
+
+    ip = get_client_ip(request)
+    log_audit_event(
+        db,
+        action="UPDATE_BRANDING",
+        username=current_user.get("username", "Admin"),
+        role="owner",
+        details=f"Updated branding: Name='{final_name}', Tagline='{final_tagline}', LogoChanged={logo_updated}",
+        ip_address=ip,
+    )
+
+    await sse_hub.broadcast("SETTINGS_UPDATED", {
+        "type": "SETTINGS_UPDATED",
+        "settings": {
+            "shop_name": final_name,
+            "shop_tagline": final_tagline,
+            "shop_logo_url": logo_url,
+        },
+    })
+
+    return {
+        "success": True,
+        "shop_name": final_name,
+        "shop_tagline": final_tagline,
         "logo_url": logo_url,
     }
 
@@ -410,57 +518,6 @@ def get_app_version():
     }
 
 
-@router.get("/updates/check")
-@router.get("/updates")
-def check_for_updates():
-    """
-    Checks GitHub Releases for new published versions.
-    Returns release information, comparison against APP_VERSION, and download asset details.
-    """
-    return check_github_for_updates()
-
-
-@router.post("/updates/apply")
-async def apply_update(
-    request: Request,
-    current_user: dict = Depends(require_owner),
-):
-    """
-    Downloads the new release executable from GitHub and triggers the safe Windows self-replacement.
-    Protected: Restricted to studio owners.
-    """
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    download_url = (body.get("download_url") or "").strip()
-    if not download_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A valid download_url is required to apply the update.",
-        )
-
-    ip = get_client_ip(request)
-    log_audit_event(
-        get_db(),
-        action="APPLY_UPDATE",
-        username=current_user.get("username", "owner"),
-        role="owner",
-        ip_address=ip,
-        details=f"Triggered application update from {download_url}",
-    )
-
-    result = trigger_update_pipeline(download_url)
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=result.get("message", "Failed to apply update."),
-        )
-
-    return result
-
-
 @router.post("/backup-now")
 @router.post("/backup")
 def trigger_manual_backup(
@@ -494,66 +551,4 @@ def trigger_manual_backup(
         "count": csv_result.get("count", 0),
         "message": csv_result.get("message") or f"Backup updated successfully as '{csv_result.get('filename')}'.",
     }
-
-
-# ---------------------------------------------------------------------------
-# Thermal Printer Management (PIXEL DP82 / ESC/POS Spooler)
-# ---------------------------------------------------------------------------
-@router.get("/system/printers")
-def list_system_printers():
-    """Returns all installed OS printers and the currently selected/detected thermal printer."""
-    installed = get_installed_printers()
-    active = get_active_printer()
-    return {
-        "success": True,
-        "printers": installed,
-        "active_printer": active,
-    }
-
-
-@router.post("/system/printers/select")
-def select_system_printer(payload: dict):
-    """Saves user-selected thermal printer preference in settings table."""
-    printer_name = (payload.get("printer_name") or "").strip()
-    if not printer_name:
-        raise HTTPException(status_code=400, detail="Printer name is required.")
-
-    ok = set_active_printer(printer_name)
-    if not ok:
-        raise HTTPException(status_code=500, detail="Failed to save thermal printer preference.")
-
-    return {
-        "success": True,
-        "active_printer": printer_name,
-        "message": f"Active thermal printer set to '{printer_name}'.",
-    }
-
-
-@router.post("/system/printers/test")
-def test_thermal_printer(payload: dict = None):
-    """Prints a test ticket and performs cutter clearance test on PIXEL DP82."""
-    target = None
-    if payload and payload.get("printer_name"):
-        target = payload.get("printer_name").strip()
-    target = target or get_active_printer()
-
-    if not target:
-        raise HTTPException(status_code=400, detail="No thermal printer detected. Please connect your PIXEL DP82 via USB.")
-
-    try:
-        raw_ticket = build_test_receipt(target)
-        ok, msg = send_raw_escpos_to_printer(target, raw_ticket)
-        if not ok:
-            raise HTTPException(status_code=500, detail=msg)
-
-        return {
-            "success": True,
-            "printer": target,
-            "message": msg,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"Thermal printer test error: {e}")
-        raise HTTPException(status_code=500, detail=f"Thermal test failed: {e}")
 

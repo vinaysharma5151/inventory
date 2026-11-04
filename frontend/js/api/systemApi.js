@@ -51,6 +51,28 @@ export const systemApi = {
   },
 
   /**
+   * Updates studio branding (name, tagline, and logo file or base64).
+   * @param {FormData|object} payload
+   * @returns {Promise<{success: boolean, shop_name?: string, shop_tagline?: string, logo_url?: string}>}
+   */
+  async updateBranding(payload) {
+    try {
+      let options = { method: 'POST' };
+      if (payload instanceof FormData) {
+        options.body = payload;
+      } else {
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify(payload);
+      }
+      const res = await request(`${API_BASE}/branding`, options);
+      if (!res.ok) return { success: false };
+      return res.json();
+    } catch (_) {
+      return { success: false };
+    }
+  },
+
+  /**
    * Triggers an immediate manual database snapshot/backup.
    * @returns {Promise<{success: boolean, backup_name: string, message: string}>}
    */
@@ -178,75 +200,6 @@ export const systemApi = {
       window.removeEventListener('beforeunload', cleanup);
       window.removeEventListener('pagehide', cleanup);
     };
-  },
-
-  /**
-   * Retrieves list of installed OS printers and the active thermal printer.
-   * @returns {Promise<{success: boolean, printers: string[], active_printer: string|null}>}
-   */
-  async getPrinters() {
-    try {
-      const res = await request(`${API_BASE}/system/printers`);
-      if (!res.ok) return { success: false, printers: [], active_printer: null };
-      return res.json();
-    } catch (_) {
-      return { success: false, printers: [], active_printer: null };
-    }
-  },
-
-  /**
-   * Sets preferred thermal printer for direct ESC/POS printing.
-   * @param {string} printerName - Target printer name
-   * @returns {Promise<{success: boolean, message: string}>}
-   */
-  async selectPrinter(printerName) {
-    const res = await request(`${API_BASE}/system/printers/select`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ printer_name: printerName })
-    });
-    return res.json();
-  },
-
-  /**
-   * Prints an 80mm diagnostic ticket with paper feed and cut test.
-   * @param {string} [printerName] - Target printer name (optional)
-   * @returns {Promise<{success: boolean, message: string}>}
-   */
-  async testPrintPrinter(printerName) {
-    const res = await request(`${API_BASE}/system/printers/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ printer_name: printerName || '' })
-    });
-    return res.json();
-  },
-
-  /**
-   * Checks GitHub Releases for software updates.
-   * @returns {Promise<{success: boolean, update_available: boolean, current_version: string, latest_version: string, release_notes: string, download_url: string, asset_name: string, asset_size: number, message: string}>}
-   */
-  async checkForUpdates() {
-    const res = await request(`${API_BASE}/updates/check`);
-    return res.json();
-  },
-
-  /**
-   * Downloads and applies the specified update release asset.
-   * @param {string} downloadUrl - GitHub releases binary download URL
-   * @returns {Promise<{success: boolean, message: string}>}
-   */
-  async applyUpdate(downloadUrl) {
-    const res = await request(`${API_BASE}/updates/apply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ download_url: downloadUrl })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
-      throw new Error(data.detail || data.message || 'Update failed');
-    }
-    return data;
   }
 };
 

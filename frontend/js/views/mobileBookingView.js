@@ -10,6 +10,7 @@
 
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
+import { showToast } from '../toast.js';
 import { initMobileCamera } from './mobile/mobileCamera.js';
 import { initPaymentCalculator } from './mobile/paymentCalculator.js';
 import { initSubmitOverlay } from './mobile/mobileSubmitOverlay.js';
@@ -39,6 +40,7 @@ export function createMobileBookingView(containerEl, state) {
   let cameraController = null;
   let paymentController = null;
   let overlayController = null;
+  let editingArticle = null;
 
   const renderMain = () => {
     containerEl.innerHTML = `
@@ -61,6 +63,66 @@ export function createMobileBookingView(containerEl, state) {
 
         <!-- Main Content -->
         <main class="mobile-content-body">
+          <!-- SEARCH ARTICLE TO EDIT -->
+          <section class="mobile-search-card" aria-label="Search Article">
+            <div class="mobile-search-header">
+              <span class="mobile-search-title">
+                ${renderIcon('search', { size: 14, color: '#8C6A2A' })}
+                <span>Search Article ID</span>
+              </span>
+              <span class="mobile-search-subhint">Load &amp; Edit Previous Data</span>
+            </div>
+            <div class="mobile-search-input-wrap">
+              <div class="mobile-search-icon-box">
+                ${renderIcon('search', { size: 16, color: '#8C6A2A' })}
+              </div>
+              <input
+                type="text"
+                id="m-search-article-input"
+                class="mobile-search-input font-mono"
+                placeholder="Type Article ID (e.g. 0001)..."
+                autocomplete="off"
+                autocapitalize="characters"
+              />
+              <button type="button" id="btn-m-search-clear" class="mobile-search-clear-btn" style="display: none;" title="Clear Search">
+                ${renderIcon('x', { size: 15 })}
+              </button>
+              <button type="button" id="btn-m-search-submit" class="btn btn-gold btn-sm mobile-search-action-btn">
+                <span>Find</span>
+              </button>
+            </div>
+
+            <!-- Customer / Person Name Result Box in Search Card -->
+            <div id="m-search-name-result" class="mobile-search-name-box" style="display: none;">
+              <span class="search-name-icon">${renderIcon('user', { size: 16, color: '#8C6A2A' })}</span>
+              <div class="search-name-text-group">
+                <span class="search-name-caption">Customer / Person Name</span>
+                <span id="m-search-name-value" class="search-name-val"></span>
+              </div>
+            </div>
+
+            <div id="m-search-status-bar" class="mobile-search-status-bar" style="display: none;"></div>
+          </section>
+
+          <!-- ACTIVE EDIT MODE BANNER -->
+          <div id="m-edit-mode-banner" class="mobile-edit-mode-banner" style="display: none;">
+            <div class="edit-banner-left">
+              <span class="edit-banner-pulsing-icon">✏️</span>
+              <div>
+                <div class="edit-banner-title">
+                  <span>Editing Article</span>
+                  <span id="m-edit-banner-id" class="font-mono">#0001</span>
+                  <span id="m-edit-banner-cust-badge" class="edit-banner-name-badge" style="display: none;"></span>
+                </div>
+                <div class="edit-banner-sub">Previous data loaded. Edit and save below.</div>
+              </div>
+            </div>
+            <button type="button" id="btn-m-cancel-edit" class="btn btn-outline btn-xs edit-mode-cancel-btn" title="Cancel Editing">
+              ${renderIcon('x', { size: 13 })}
+              <span>Cancel Edit</span>
+            </button>
+          </div>
+
           <!-- 1. CAMERA VIEWFINDER -->
           <div class="camera-viewfinder-card" id="camera-card-wrap">
             <div class="viewfinder-frame" id="camera-frame">
@@ -160,6 +222,9 @@ export function createMobileBookingView(containerEl, state) {
               </div>
               <div class="id-input-wrap">
                 <input type="text" id="m-article-id" class="input-field font-mono" value="0001" placeholder="0001" required />
+                <button type="button" id="btn-find-mid" class="btn btn-gold id-find-btn" title="Find Article &amp; Customer Name">
+                  <span>Find</span>
+                </button>
                 <button type="button" id="btn-refresh-mid" class="btn btn-outline id-random-btn" title="Refresh Next ID">
                   ${renderIcon('rotateCw', { size: 18 })}
                 </button>
@@ -280,7 +345,15 @@ export function createMobileBookingView(containerEl, state) {
                 <label class="input-label" for="m-cust-phone">Customer Phone Number</label>
                 <div class="input-with-icon">
                   <span class="field-icon">${renderIcon('phone', { size: 16 })}</span>
-                  <input type="tel" id="m-cust-phone" class="input-field font-mono" placeholder="e.g. 98765 43210" />
+                  <input type="tel" id="m-cust-phone" class="input-field font-mono" placeholder="e.g. 98765 43210" autocomplete="tel" />
+                </div>
+              </div>
+
+              <div>
+                <label class="input-label" for="m-cust-alt-phone">Alternative No. (Optional)</label>
+                <div class="input-with-icon">
+                  <span class="field-icon">${renderIcon('phone', { size: 16 })}</span>
+                  <input type="tel" id="m-cust-alt-phone" class="input-field font-mono" placeholder="e.g. 98765 12345" autocomplete="tel" />
                 </div>
               </div>
 
@@ -324,10 +397,20 @@ export function createMobileBookingView(containerEl, state) {
     const refreshIdBtn = containerEl.querySelector('#btn-refresh-mid');
     const custNameInput = containerEl.querySelector('#m-cust-name');
     const custPhoneInput = containerEl.querySelector('#m-cust-phone');
+    const custAltPhoneInput = containerEl.querySelector('#m-cust-alt-phone');
     const custAddrInput = containerEl.querySelector('#m-cust-addr');
     const priceInput = containerEl.querySelector('#m-price-input');
     const submitBtn = containerEl.querySelector('#btn-submit-booking');
     const submitLabel = containerEl.querySelector('#m-submit-label');
+
+    // Search & Edit Elements
+    const searchInput = containerEl.querySelector('#m-search-article-input');
+    const searchClearBtn = containerEl.querySelector('#btn-m-search-clear');
+    const searchSubmitBtn = containerEl.querySelector('#btn-m-search-submit');
+    const statusBar = containerEl.querySelector('#m-search-status-bar');
+    const editBanner = containerEl.querySelector('#m-edit-mode-banner');
+    const editBannerId = containerEl.querySelector('#m-edit-banner-id');
+    const cancelEditBtn = containerEl.querySelector('#btn-m-cancel-edit');
 
     // Initialize Subcomponents
     cameraController = initMobileCamera(containerEl, {
@@ -344,6 +427,7 @@ export function createMobileBookingView(containerEl, state) {
 
     // Fetch Next Sequential ID
     const fetchNextId = async () => {
+      if (editingArticle) return; // Do not overwrite ID in edit mode
       try {
         const res = await api.getNextArticleId();
         if (res.success && res.next_id) {
@@ -354,7 +438,13 @@ export function createMobileBookingView(containerEl, state) {
       }
     };
     fetchNextId();
-    refreshIdBtn.addEventListener('click', fetchNextId);
+    refreshIdBtn.addEventListener('click', () => {
+      if (editingArticle) {
+        exitEditMode();
+      } else {
+        fetchNextId();
+      }
+    });
 
     // Date changes
     pickupInput.addEventListener('change', (e) => {
@@ -445,41 +535,340 @@ export function createMobileBookingView(containerEl, state) {
 
     custNameInput.addEventListener('input', () => updateSubmitState());
 
-    // Validation
+    // --- Search & Edit Mode Functions ---
+    let searchStatusTimeout = null;
+    const showSearchStatus = (msg, type = 'info') => {
+      if (!statusBar) return;
+      if (searchStatusTimeout) clearTimeout(searchStatusTimeout);
+      statusBar.className = `mobile-search-status-bar ${type}`;
+      statusBar.textContent = msg;
+      statusBar.style.display = 'flex';
+      searchStatusTimeout = setTimeout(() => {
+        statusBar.style.display = 'none';
+      }, 5000);
+    };
+
+    const hideSearchStatus = () => {
+      if (statusBar) statusBar.style.display = 'none';
+      if (searchStatusTimeout) clearTimeout(searchStatusTimeout);
+    };
+
+    // Load an existing article's data into the form for editing
+    const loadArticleForEditing = (article) => {
+      if (!article) return;
+      editingArticle = article;
+
+      // 1. Show Edit Mode Banner
+      if (editBanner && editBannerId) {
+        editBannerId.textContent = `#${article.article_id}`;
+        editBanner.style.display = 'flex';
+      }
+
+      // 2. Populate Article ID
+      articleIdInput.value = article.article_id || '';
+
+      // 3. Populate Dates
+      if (article.pickup_date) {
+        pickupDate = article.pickup_date;
+        pickupInput.value = article.pickup_date;
+      }
+      if (article.return_date) {
+        returnDate = article.return_date;
+        returnInput.value = article.return_date;
+      }
+
+      // 4. Populate Category
+      category = article.category || 'Bridal';
+      containerEl.querySelectorAll('#m-category-chips .category-chip').forEach((btn) => {
+        if ((btn.dataset.cat || '').toLowerCase() === (category || '').toLowerCase()) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // 5. Populate Jewellery
+      const hasJewel = Number(article.has_jewellery || 0) === 1;
+      jewelToggle.checked = hasJewel;
+      jewelPriceInput.value = hasJewel ? (article.jewellery_price || 0) : 0;
+      const jewelDesc = article.jewellery_details || 'Full Bridal Set';
+      jewelDescInput.value = jewelDesc;
+      jewelChips.forEach((btn) => {
+        if (btn.dataset.val === jewelDesc) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      updateJewelState();
+
+      // 6. Populate Pricing & Advance
+      const totalArticlePrice = parseFloat(article.price) || 0;
+      const jPrice = hasJewel ? (parseFloat(article.jewellery_price) || 0) : 0;
+      const garmentP = Math.max(0, totalArticlePrice - jPrice);
+      priceInput.value = garmentP > 0 ? garmentP : totalArticlePrice;
+      advanceInput.value = (article.advance_amount !== undefined && article.advance_amount !== null) ? article.advance_amount : 0;
+      paymentController?.update();
+
+      // 7. Populate Customer Details
+      const personName = (article.customer_name || '').trim();
+      custNameInput.value = personName;
+      custNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      custNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+      custNameInput.classList.remove('highlight-pulse');
+      void custNameInput.offsetWidth;
+      custNameInput.classList.add('highlight-pulse');
+
+      custPhoneInput.value = article.customer_phone || '';
+      if (custAltPhoneInput) custAltPhoneInput.value = article.customer_alt_phone || '';
+      custAddrInput.value = article.customer_address || article.notes || '';
+
+      // Update Search Card Customer / Person Name Result Box
+      const searchNameResult = containerEl.querySelector('#m-search-name-result');
+      const searchNameValue = containerEl.querySelector('#m-search-name-value');
+      if (searchNameResult && searchNameValue) {
+        searchNameValue.textContent = personName || 'Guest / Unnamed Booking';
+        searchNameResult.style.display = 'flex';
+      }
+
+      // Update Edit Banner Name Badge
+      const editCustBadge = containerEl.querySelector('#m-edit-banner-cust-badge');
+      if (editCustBadge) {
+        if (personName) {
+          editCustBadge.textContent = personName;
+          editCustBadge.style.display = 'inline-block';
+        } else {
+          editCustBadge.style.display = 'none';
+        }
+      }
+
+      // Sync search input if invoked from article ID field
+      if (searchInput && article.article_id) {
+        searchInput.value = article.article_id;
+        if (searchClearBtn) searchClearBtn.style.display = 'flex';
+      }
+
+      // 8. Populate Garment Photo (Show existing image in preview)
+      if (article.image_path) {
+        cameraController?.showExistingPhoto(article.image_path);
+      }
+
+      // 9. Status feedback
+      showSearchStatus(`✓ Loaded Article ${article.article_id} (${personName || 'Guest'})`, 'success');
+      showToast(`Loaded ${personName ? personName + ' — ' : ''}Article #${article.article_id}`, 'success', 2500);
+
+      // 10. Update submit button
+      updateSubmitState();
+
+      // Smoothly scroll directly to the Customer Name field so the user sees it filled immediately
+      setTimeout(() => {
+        if (custNameInput) {
+          custNameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 120);
+    };
+
+    // Exit Edit Mode and revert form to New Booking
+    const exitEditMode = () => {
+      editingArticle = null;
+      if (editBanner) editBanner.style.display = 'none';
+      const editCustBadge = containerEl.querySelector('#m-edit-banner-cust-badge');
+      if (editCustBadge) editCustBadge.style.display = 'none';
+      const searchNameResult = containerEl.querySelector('#m-search-name-result');
+      if (searchNameResult) searchNameResult.style.display = 'none';
+      if (searchInput) searchInput.value = '';
+      if (searchClearBtn) searchClearBtn.style.display = 'none';
+      hideSearchStatus();
+      resetForm();
+    };
+
+    // Handle Article Search
+    const handleSearchArticle = async (customQuery = null) => {
+      let rawQuery = '';
+      if (typeof customQuery === 'string' && customQuery.trim()) {
+        rawQuery = customQuery;
+      } else if (searchInput && searchInput.value && searchInput.value.trim()) {
+        rawQuery = searchInput.value;
+      } else if (articleIdInput && articleIdInput.value && articleIdInput.value.trim()) {
+        rawQuery = articleIdInput.value;
+      }
+
+      const query = rawQuery.trim();
+      if (!query) {
+        showSearchStatus('Please enter an Article ID to search.', 'info');
+        if (searchInput) searchInput.focus();
+        return;
+      }
+
+      if (searchSubmitBtn) {
+        searchSubmitBtn.disabled = true;
+        searchSubmitBtn.innerHTML = `${renderIcon('loader', { size: 14, className: 'spinner-icon' })}`;
+      }
+      const findMidBtn = containerEl.querySelector('#btn-find-mid');
+      if (findMidBtn) {
+        findMidBtn.disabled = true;
+      }
+
+      try {
+        const res = await api.getArticleByCode(query);
+        if (res && res.success && res.article) {
+          loadArticleForEditing(res.article);
+        } else {
+          showSearchStatus(`Article "${query}" not found in database.`, 'error');
+        }
+      } catch (err) {
+        showSearchStatus(`Article "${query}" not found in database.`, 'error');
+      } finally {
+        if (searchSubmitBtn) {
+          searchSubmitBtn.disabled = false;
+          searchSubmitBtn.innerHTML = '<span>Find</span>';
+        }
+        if (findMidBtn) {
+          findMidBtn.disabled = false;
+        }
+      }
+    };
+
+    if (searchSubmitBtn) searchSubmitBtn.addEventListener('click', () => handleSearchArticle());
+
+    const findMidBtn = containerEl.querySelector('#btn-find-mid');
+    if (findMidBtn) {
+      findMidBtn.addEventListener('click', () => {
+        const val = (articleIdInput.value || '').trim();
+        if (val) {
+          if (searchInput) searchInput.value = val;
+          handleSearchArticle(val);
+        } else {
+          showSearchStatus('Please enter an Article ID to search.', 'info');
+          articleIdInput.focus();
+        }
+      });
+    }
+
+    let searchDebounceTimer = null;
+    if (searchInput) {
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+          handleSearchArticle();
+        }
+      });
+
+      searchInput.addEventListener('input', () => {
+        const val = searchInput.value.trim();
+        if (searchClearBtn) searchClearBtn.style.display = val ? 'flex' : 'none';
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        // Auto-search smoothly when sequence length reached (e.g. 0001)
+        if (val.length >= 4) {
+          searchDebounceTimer = setTimeout(() => {
+            handleSearchArticle();
+          }, 450);
+        }
+      });
+    }
+
+    if (articleIdInput) {
+      articleIdInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = articleIdInput.value.trim();
+          if (val && !editingArticle) {
+            if (searchInput) searchInput.value = val;
+            handleSearchArticle(val, true);
+          }
+        }
+      });
+    }
+
+    if (searchClearBtn) {
+      searchClearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchClearBtn.style.display = 'none';
+        hideSearchStatus();
+        if (editingArticle) {
+          exitEditMode();
+        }
+      });
+    }
+
+    if (cancelEditBtn) {
+      cancelEditBtn.addEventListener('click', () => {
+        exitEditMode();
+        showToast('Switched back to New Booking mode', 'info');
+      });
+    }
+
+    // Validation & Submit Button State
     const updateSubmitState = () => {
-      const hasPhoto = Boolean(cameraController?.getPhotoBlob());
+      const hasPhoto = Boolean(
+        cameraController?.hasPhoto
+          ? cameraController.hasPhoto()
+          : cameraController?.getPhotoBlob()
+      );
       const hasPrice = (parseFloat(priceInput.value) || 0) > 0;
       const hasCustomer = custNameInput.value.trim().length > 0;
 
-      if (!hasPhoto) {
-        submitLabel.textContent = 'Take Garment Photo';
-        submitBtn.disabled = true;
-      } else if (!hasPrice) {
-        submitLabel.textContent = 'Enter Garment Price';
-        submitBtn.disabled = true;
-      } else if (!hasCustomer) {
-        submitLabel.textContent = 'Enter Customer Name';
-        submitBtn.disabled = true;
+      if (editingArticle) {
+        submitBtn.classList.add('editing');
+        if (!hasPhoto) {
+          submitLabel.textContent = 'Take Garment Photo';
+          submitBtn.disabled = true;
+        } else if (!hasPrice) {
+          submitLabel.textContent = 'Enter Garment Price';
+          submitBtn.disabled = true;
+        } else if (!hasCustomer) {
+          submitLabel.textContent = 'Enter Customer Name';
+          submitBtn.disabled = true;
+        } else {
+          submitLabel.textContent = `Update Article ${editingArticle.article_id} →`;
+          submitBtn.disabled = false;
+        }
       } else {
-        submitLabel.textContent = 'Save & Sync to Laptop →';
-        submitBtn.disabled = false;
+        submitBtn.classList.remove('editing');
+        if (!hasPhoto) {
+          submitLabel.textContent = 'Take Garment Photo';
+          submitBtn.disabled = true;
+        } else if (!hasPrice) {
+          submitLabel.textContent = 'Enter Garment Price';
+          submitBtn.disabled = true;
+        } else if (!hasCustomer) {
+          submitLabel.textContent = 'Enter Customer Name';
+          submitBtn.disabled = true;
+        } else {
+          submitLabel.textContent = 'Save & Sync to Laptop →';
+          submitBtn.disabled = false;
+        }
       }
     };
 
     // Reset Form for next booking
     const resetForm = () => {
+      editingArticle = null;
+      if (editBanner) editBanner.style.display = 'none';
+      const editCustBadge = containerEl.querySelector('#m-edit-banner-cust-badge');
+      if (editCustBadge) {
+        editCustBadge.style.display = 'none';
+        editCustBadge.textContent = '';
+      }
+      const searchNameResult = containerEl.querySelector('#m-search-name-result');
+      const searchNameValue = containerEl.querySelector('#m-search-name-value');
+      if (searchNameResult) searchNameResult.style.display = 'none';
+      if (searchNameValue) searchNameValue.textContent = '';
+
       cameraController?.reset();
       jewelToggle.checked = false;
       updateJewelState();
       paymentController?.reset();
       custNameInput.value = '';
       custPhoneInput.value = '';
+      if (custAltPhoneInput) custAltPhoneInput.value = '';
       custAddrInput.value = '';
       fetchNextId();
       updateSubmitState();
     };
 
-    // Submit Booking
+    // Submit Booking or Update
     submitBtn.addEventListener('click', async () => {
       const payValues = paymentController.getValues();
       const p = payValues.price;
@@ -487,49 +876,122 @@ export function createMobileBookingView(containerEl, state) {
       const bal = payValues.balance;
       const name = custNameInput.value.trim();
       const photoBlob = cameraController?.getPhotoBlob();
+      const hasPhoto = Boolean(
+        cameraController?.hasPhoto
+          ? cameraController.hasPhoto()
+          : photoBlob
+      );
 
-      if (!photoBlob || p <= 0 || !name) return;
+      if (!hasPhoto || p <= 0 || !name) return;
 
       const hasJewel = jewelToggle.checked ? 1 : 0;
       const jewelDetails = hasJewel ? (jewelDescInput.value.trim() || 'Full Bridal Set') : '';
       const jewelPrice = hasJewel ? (parseFloat(jewelPriceInput.value) || 0) : 0;
-
       const finalId = articleIdInput.value.trim().toUpperCase() || '0001';
 
-      overlayController.showProgress();
+      if (editingArticle) {
+        // --- EDIT EXISTING ARTICLE ---
+        overlayController.showProgress(
+          'Updating Article...',
+          `Saving changes for ${editingArticle.article_id} & syncing with laptop...`
+        );
 
-      const formData = new FormData();
-      formData.append('photo', photoBlob, `${finalId}.jpg`);
-      formData.append('article_id', finalId);
-      formData.append('title', category || 'Bridal');
-      formData.append('category', category);
-      formData.append('price', p);
-      formData.append('advance_amount', adv);
-      formData.append('balance_amount', bal);
-      formData.append('has_jewellery', hasJewel);
-      formData.append('jewellery_details', jewelDetails);
-      formData.append('jewellery_price', jewelPrice);
-      formData.append('customer_name', name);
-      formData.append('customer_phone', custPhoneInput.value.trim());
-      formData.append('customer_address', custAddrInput.value.trim());
-      formData.append('pickup_date', pickupInput.value);
-      formData.append('return_date', returnInput.value);
-      formData.append('booking_date', getISODate(0));
-      formData.append('source', 'phone');
-      formData.append('salesman_name', 'Studio');
+        const updatePayload = {
+          article_id: finalId,
+          title: category || 'Bridal',
+          category: category,
+          price: p,
+          advance_amount: adv,
+          balance_amount: bal,
+          has_jewellery: hasJewel,
+          jewellery_details: jewelDetails,
+          jewellery_price: jewelPrice,
+          customer_name: name,
+          customer_phone: custPhoneInput.value.trim(),
+          customer_alt_phone: custAltPhoneInput ? custAltPhoneInput.value.trim() : (editingArticle.customer_alt_phone || null),
+          customer_address: custAddrInput.value.trim(),
+          pickup_date: pickupInput.value,
+          return_date: returnInput.value,
+          booking_date: editingArticle.booking_date || getISODate(0),
+          salesman_name: editingArticle.salesman_name || 'Studio',
+          status: editingArticle.status || 'booked',
+        };
 
-      try {
-        const res = await api.uploadArticle(formData);
-        if (res.success) {
-          if (state.onBookingCreated) state.onBookingCreated(res.article);
-          overlayController.showSuccess(res.article, resetForm);
-        } else {
-          alert(res.message || 'Failed to submit booking');
+        try {
+          // 1. Update metadata fields
+          const res = await api.updateArticle(editingArticle.id, updatePayload);
+          let updatedArticle = res.article || { ...editingArticle, ...updatePayload };
+
+          // 2. If a replacement photo was snapped or selected from gallery, upload it
+          if (photoBlob) {
+            overlayController.showProgress(
+              'Uploading Photo...',
+              `Uploading new garment photo for ${finalId}...`
+            );
+            const photoRes = await api.uploadArticlePhoto(editingArticle.id, photoBlob);
+            if (photoRes && photoRes.article) {
+              updatedArticle = photoRes.article;
+            }
+          }
+
+          if (state.onBookingUpdated) {
+            state.onBookingUpdated(updatedArticle);
+          }
+
+          showToast(`Article ${updatedArticle.article_id} updated successfully!`, 'success');
+          overlayController.showSuccess(updatedArticle, () => {
+            exitEditMode();
+          });
+        } catch (err) {
+          alert('Failed to update article: ' + (err.message || 'Unknown error'));
           overlayController.hide();
         }
-      } catch (err) {
-        alert('Upload failed: ' + err.message);
-        overlayController.hide();
+      } else {
+        // --- CREATE NEW BOOKING ---
+        if (!photoBlob) return;
+
+        overlayController.showProgress(
+          'Syncing Booking...',
+          'Saving booking & syncing with laptop...'
+        );
+
+        const formData = new FormData();
+        formData.append('photo', photoBlob, `${finalId}.jpg`);
+        formData.append('article_id', finalId);
+        formData.append('title', category || 'Bridal');
+        formData.append('category', category);
+        formData.append('price', p);
+        formData.append('advance_amount', adv);
+        formData.append('balance_amount', bal);
+        formData.append('has_jewellery', hasJewel);
+        formData.append('jewellery_details', jewelDetails);
+        formData.append('jewellery_price', jewelPrice);
+        formData.append('customer_name', name);
+        formData.append('customer_phone', custPhoneInput.value.trim());
+        formData.append('customer_alt_phone', custAltPhoneInput ? custAltPhoneInput.value.trim() : '');
+        formData.append('customer_address', custAddrInput.value.trim());
+        formData.append('pickup_date', pickupInput.value);
+        formData.append('return_date', returnInput.value);
+        formData.append('booking_date', getISODate(0));
+        formData.append('source', 'phone');
+        formData.append('salesman_name', 'Studio');
+
+        try {
+          const res = await api.uploadArticle(formData);
+          if (res.success) {
+            if (state.onBookingCreated) state.onBookingCreated(res.article);
+            if (res.whatsapp_dispatch && res.whatsapp_dispatch.success) {
+              res.article._wa_dispatched = true;
+            }
+            overlayController.showSuccess(res.article, resetForm);
+          } else {
+            alert(res.message || 'Failed to submit booking');
+            overlayController.hide();
+          }
+        } catch (err) {
+          alert('Upload failed: ' + err.message);
+          overlayController.hide();
+        }
       }
     });
 

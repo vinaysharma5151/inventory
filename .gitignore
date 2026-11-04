@@ -33,7 +33,10 @@ ehthumbs.db
 *.sqlite-wal
 *.sqlite-shm
 *.sqlite-journal
-*.local_backup
+*.local_backup*
+
+# Backup assets
+frontend/assets/backup_original/
 
 # Keep directories but ignore runtime content
 uploads/*

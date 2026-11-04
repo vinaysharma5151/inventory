@@ -1,26 +1,26 @@
 /**
- * whatsappApi.js — Meta WhatsApp Business Cloud API & Direct Messaging calls.
+ * whatsappApi.js — OpenWA Gateway Direct Messaging calls.
  */
 
 import { API_BASE, request } from './client.js';
 
 export const whatsappApi = {
   /**
-   * Checks overall WhatsApp configuration (Meta Cloud API credentials presence & mode).
-   * @returns {Promise<{success: boolean, mode: string, is_meta_configured: boolean, phone_number_id?: string, masked_token?: string, shop_name?: string}>}
+   * Checks overall WhatsApp configuration (OpenWA connection & active session status).
+   * @returns {Promise<{success: boolean, mode: string, gateway: string, server_url: string, has_api_key: boolean, masked_key: string, session_id: string, session_name: string, session_status: string, connected_phone: string, push_name: string, is_ready: boolean, shop_name: string}>}
    */
   async getWhatsAppStatus() {
     try {
       const res = await request(`${API_BASE}/whatsapp/status`);
       return await res.json();
     } catch (e) {
-      return { success: false, mode: 'direct', is_meta_configured: false };
+      return { success: false, mode: 'openwa', is_ready: false };
     }
   },
 
   /**
-   * Saves Meta WhatsApp Business Cloud API credentials.
-   * @param {{phone_number_id: string, access_token: string, mode?: string, template_name?: string}} payload
+   * Saves OpenWA Gateway credentials.
+   * @param {{server_url: string, api_key: string, session_id?: string}} payload
    */
   async saveWhatsAppSettings(payload) {
     const res = await request(`${API_BASE}/whatsapp/settings`, {
@@ -32,7 +32,7 @@ export const whatsappApi = {
   },
 
   /**
-   * Sends a test ping via Meta WhatsApp Cloud API.
+   * Sends a test ping via OpenWA.
    * @param {string} phoneNumber - 10-digit mobile number
    * @param {string|null} [message] - Optional custom message
    */
@@ -46,9 +46,9 @@ export const whatsappApi = {
   },
 
   /**
-   * Gets formatted e-bill text and wa.me link for an article.
+   * Gets formatted e-bill text for an article.
    * @param {number|string} articleId - Article database ID
-   * @returns {Promise<{success: boolean, ebill_text: string, customer_phone: string, whatsapp_url: string}>}
+   * @returns {Promise<{success: boolean, ebill_text: string, customer_phone: string}>}
    */
   async getEbill(articleId) {
     try {
@@ -60,25 +60,18 @@ export const whatsappApi = {
   },
 
   /**
-   * Dispatches e-bill via official Meta Cloud API or generates direct wa.me link.
+   * Dispatches e-bill directly via OpenWA Gateway.
    * @param {number|string} articleId - Article database ID
    * @param {string|null} [phoneOverride] - Optional phone override
-   * @param {string|null} [mode] - Optional explicit mode ('meta' | 'direct')
-   * @param {boolean} [autoOpenBrowser=false] - Whether to automatically pop open wa.me in browser
-   * @returns {Promise<{success: boolean, direct_sent?: boolean, sent_via?: string, whatsapp_url?: string, ebill_text?: string, message?: string, error?: string}>}
+   * @returns {Promise<{success: boolean, direct_sent?: boolean, sent_via?: string, ebill_text?: string, message?: string, error?: string}>}
    */
-  async sendWhatsAppBill(articleId, phoneOverride = null, mode = null, autoOpenBrowser = false) {
+  async sendWhatsAppBill(articleId, phoneOverride = null) {
     const res = await request(`${API_BASE}/whatsapp/send-article/${articleId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone_override: phoneOverride, mode }),
+      body: JSON.stringify({ phone_override: phoneOverride }),
     });
-    const data = await res.json();
-
-    if (autoOpenBrowser && data.whatsapp_url) {
-      window.open(data.whatsapp_url, '_blank');
-    }
-    return data;
+    return await res.json();
   },
 
   /**
@@ -95,7 +88,7 @@ export const whatsappApi = {
   },
 
   /**
-   * Sends outfit pickup reminder to customer 1 day before pickup date.
+   * Sends outfit pickup reminder to customer via OpenWA.
    * @param {number|string} articleId
    * @param {string|null} [phoneOverride]
    */
@@ -121,6 +114,59 @@ export const whatsappApi = {
       return { success: false, error: e.message };
     }
   },
+
+  /**
+   * Retrieves return reminder text and details for an article.
+   * @param {number|string} articleId
+   */
+  async getReturnReminder(articleId) {
+    try {
+      const res = await request(`${API_BASE}/whatsapp/return-reminder-text/${articleId}`);
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  /**
+   * Sends outfit return reminder to customer via OpenWA.
+   * @param {number|string} articleId
+   * @param {string|null} [phoneOverride]
+   */
+  async sendReturnReminder(articleId, phoneOverride = null) {
+    const res = await request(`${API_BASE}/whatsapp/send-return-reminder/${articleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone_override: phoneOverride }),
+    });
+    return await res.json();
+  },
+
+  /**
+   * Scans bookings scheduled for return tomorrow and auto-dispatches return reminders.
+   */
+  async checkReturnReminders() {
+    try {
+      const res = await request(`${API_BASE}/whatsapp/check-return-reminders`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  /**
+   * Scans bookings scheduled for pickup OR return tomorrow and auto-dispatches reminders.
+   */
+  async checkAllReminders() {
+    try {
+      const res = await request(`${API_BASE}/whatsapp/check-all-reminders`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
 };
-
-

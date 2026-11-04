@@ -402,6 +402,61 @@
   font-weight: 600;
 }
 
+.filter-chip.stage-chip-not-returned {
+  color: #DC2626;
+  border-color: #FECACA;
+  background: #FFF5F5;
+}
+
+.filter-chip.stage-chip-not-returned:hover {
+  background: #FEE2E2;
+  border-color: #F87171;
+  color: #B91C1C;
+}
+
+.filter-chip.stage-chip-not-returned.active {
+  background: #DC2626;
+  border-color: #DC2626;
+  color: #FFFFFF;
+}
+
+.not-returned-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  margin-left: 5px;
+  line-height: 1.2;
+}
+
+.filter-chip.stage-chip-not-returned.active .not-returned-count-badge {
+  background: #FFFFFF;
+  color: #DC2626;
+}
+
+.card-date-item.card-date-overdue {
+  background: #FEF2F2 !important;
+  border: 1px solid #FECACA !important;
+  color: #DC2626 !important;
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px 6px;
+  font-weight: 600;
+}
+
+.card-date-item.card-date-due-today {
+  background: #FEF3C7 !important;
+  border: 1px solid #FDE68A !important;
+  color: #B45309 !important;
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px 6px;
+  font-weight: 600;
+}
+
 /* Date & Month Filter Row Styles */
 .filter-date-row {
   display: flex;
@@ -795,7 +850,7 @@
 
 .card-actions-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 5px;
   margin-top: auto;
   padding-top: 8px;
