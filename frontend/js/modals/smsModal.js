@@ -10,7 +10,7 @@
 import { openModal, closeModal } from '../modal.js';
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
-import { showToast } from '../toast.js';
+import { showToast, playMessageSentChime } from '../toast.js';
 import { openSmsSettingsModal } from './smsSettingsModal.js';
 
 function escapeHtml(str) {
@@ -36,11 +36,47 @@ function calculateSmsParts(text) {
 }
 
 /**
+ * Format collection garment description strictly for SMS templates.
+ * Appends 'Lehenga' for Bridal, Reception, and Casual collections only.
+ * @param {string} item
+ * @param {string} category
+ * @returns {string}
+ */
+function formatSmsCollectionItem(item, category) {
+  const target = (item || '').trim();
+  const cat = (category || '').trim();
+  const effective = target || cat || 'Bridal';
+
+  const mapping = {
+    bridal: 'Bridal Lehenga',
+    reception: 'Reception Lehenga',
+    casual: 'Casual Lehenga',
+  };
+
+  const effLower = effective.toLowerCase();
+  if (mapping[effLower]) {
+    return mapping[effLower];
+  }
+
+  if (effLower.includes('lehenga')) {
+    return effective;
+  }
+
+  for (const key of Object.keys(mapping)) {
+    if (effLower.endsWith(key)) {
+      return `${effective} Lehenga`;
+    }
+  }
+
+  return effective;
+}
+
+/**
  * Opens the SMS E-Bill Dispatcher Modal.
  * @param {object} article - Booking article object
  * @param {string} [shopName] - Store brand title
  */
-export async function openSmsBillModal(article, shopName = 'Bridal Studio') {
+export async function openSmsBillModal(article, shopName = 'Rental Studio') {
   const modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
 
@@ -88,14 +124,22 @@ export async function openSmsBillModal(article, shopName = 'Bridal Studio') {
 
         <!-- Phone Field -->
         <div>
-          <label class="input-label" for="sms-target-phone" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-            Customer Mobile Number
-          </label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="input-label" for="sms-target-phone" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin: 0;">
+              Customer Mobile Number
+            </label>
+            ${article.customer_alt_phone ? `
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button type="button" id="btn-use-primary-phone" class="btn btn-outline btn-xs" style="font-size: 0.72rem; padding: 2px 7px;">Primary</button>
+                <button type="button" id="btn-use-alt-phone" class="btn btn-outline btn-xs" style="font-size: 0.72rem; padding: 2px 7px;">Alt: ${escapeHtml(article.customer_alt_phone)}</button>
+              </div>
+            ` : ''}
+          </div>
           <input
             type="tel"
             id="sms-target-phone"
             class="input-field"
-            value="${escapeHtml(defaultPhone)}"
+            value="${escapeHtml(defaultPhone || article.customer_alt_phone || '')}"
             placeholder="10-digit customer mobile number"
             style="width: 100%; font-size: 0.95rem; padding: 9px 12px; font-weight: 600;"
           />
@@ -179,20 +223,20 @@ export async function openSmsBillModal(article, shopName = 'Bridal Studio') {
       : Math.max(0, price - adv);
     const rawTitle = (article.title || '').trim();
     const category = (article.category || 'Bridal').replace(/–|—/g, '-');
-    const item = (!rawTitle || rawTitle.startsWith('Booking -') || rawTitle.toLowerCase() === customerName.toLowerCase())
+    const baseItem = (!rawTitle || rawTitle.startsWith('Booking -') || rawTitle.toLowerCase() === customerName.toLowerCase())
       ? category
       : rawTitle;
+    const item = formatSmsCollectionItem(baseItem, category);
     const balStr = bal <= 0 ? 'Rs 0 (Paid)' : `Rs ${bal.toLocaleString('en-IN')}`;
 
     textArea.value = [
       `${shopName.toUpperCase()}: BOOKING ${articleId}`,
       `Dear ${customerName}`,
       `Item: ${item}`,
-      `Pickup: ${article.pickup_date || 'N/A'}`,
-      `Return: ${article.return_date || 'N/A'}`,
-      `Total: Rs ${price.toLocaleString('en-IN')}`,
-      `Adv Paid: Rs ${adv.toLocaleString('en-IN')}`,
-      `Bal Due: ${balStr}`,
+      `Pickup: ${article.pickup_date || 'N/A'} | Return: ${article.return_date || 'N/A'}`,
+      `Total: Rs ${price.toLocaleString('en-IN')} (Adv: Rs ${adv.toLocaleString('en-IN')} | Bal: ${balStr})`,
+      '- No change or alteration in article once booked.',
+      '- Return on or before due date to avoid Rs 300/day late fee.',
       'Thank you for choosing us!',
     ].join('\n');
   }
@@ -219,6 +263,20 @@ export async function openSmsBillModal(article, shopName = 'Bridal Studio') {
     if (counterBadge) counterBadge.style.display = 'none';
   }
 
+  // Quick phone toggles
+  const btnUsePrimary = modalEl.querySelector('#btn-use-primary-phone');
+  const btnUseAlt = modalEl.querySelector('#btn-use-alt-phone');
+  if (btnUsePrimary) {
+    btnUsePrimary.addEventListener('click', () => {
+      phoneInput.value = (article.customer_phone || '').trim();
+    });
+  }
+  if (btnUseAlt) {
+    btnUseAlt.addEventListener('click', () => {
+      phoneInput.value = (article.customer_alt_phone || '').trim();
+    });
+  }
+
   // Send via SIM / Android Gateway
   dispatchBtn.addEventListener('click', async () => {
     const targetPhone = phoneInput.value.trim().replace(/\D/g, '');
@@ -239,6 +297,7 @@ export async function openSmsBillModal(article, shopName = 'Bridal Studio') {
       });
 
       if (res && res.success) {
+        playMessageSentChime();
         showToast(res.message || 'SMS dispatched to customer!', 'success');
         closeModal();
       } else {

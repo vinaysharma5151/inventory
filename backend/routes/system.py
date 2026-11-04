@@ -193,7 +193,7 @@ def get_public_branding():
     db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
 
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
+    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Rental Studio"
 
     logo_row = db.execute("SELECT value FROM settings WHERE key = 'shop_logo_url'").fetchone()
     logo_url = logo_row["value"] if logo_row and logo_row["value"] else "/assets/logo.png"
@@ -242,7 +242,7 @@ async def complete_first_run_setup(request: Request):
     db = get_db()
     db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
 
-    shop_name = raw_name if raw_name else "My Bridal Studio"
+    shop_name = raw_name if raw_name else "Rental Studio"
 
     db.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_name', ?)",

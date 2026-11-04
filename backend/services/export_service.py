@@ -42,7 +42,7 @@ def generate_inventory_csv_response() -> StreamingResponse:
     writer = csv.writer(output, quoting=csv.QUOTE_ALL)
     writer.writerow([
         "ID", "Article ID", "Title / Description", "Category", "Booking Stage",
-        "Customer Name", "Customer Phone", "Customer Address", "Pickup Date", "Return Date", "Booking Date",
+        "Customer Name", "Customer Phone", "Customer Alt Phone", "Customer Address", "Pickup Date", "Return Date", "Booking Date",
         "Rental Price (₹)", "Advance (₹)", "Balance (₹)",
         "Matching Jewellery", "Jewellery Price (₹)",
         "Notes", "Image URL", "Created Date",
@@ -77,6 +77,7 @@ def generate_inventory_csv_response() -> StreamingResponse:
             sanitize_csv_cell(stage_display),
             sanitize_csv_cell(a.get("customer_name") or "N/A"),
             sanitize_csv_cell(a.get("customer_phone") or "N/A"),
+            sanitize_csv_cell(a.get("customer_alt_phone") or "N/A"),
             sanitize_csv_cell(a.get("customer_address") or "N/A"),
             sanitize_csv_cell(a.get("pickup_date") or "N/A"),
             sanitize_csv_cell(a.get("return_date") or "N/A"),

@@ -48,6 +48,8 @@ DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS login_attempts;
 DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS settings;
+DROP TABLE IF EXISTS sms_messages;
+DROP TABLE IF EXISTS sms_queue;
 
 CREATE TABLE articles (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,6 +65,7 @@ CREATE TABLE articles (
     source           TEXT    DEFAULT 'phone',
     customer_name    TEXT,
     customer_phone   TEXT,
+    customer_alt_phone TEXT,
     customer_address TEXT,
     pickup_date      TEXT,
     booking_date     TEXT,
@@ -72,17 +75,20 @@ CREATE TABLE articles (
     has_jewellery    INTEGER DEFAULT 0,
     jewellery_details TEXT,
     jewellery_price  REAL    DEFAULT 0,
+    pickup_reminder_sent INTEGER DEFAULT 0,
+    return_reminder_sent INTEGER DEFAULT 0,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_articles_article_id  ON articles(article_id);
-CREATE INDEX idx_articles_status      ON articles(status);
-CREATE INDEX idx_articles_category    ON articles(category);
-CREATE INDEX idx_articles_created     ON articles(created_at);
-CREATE INDEX idx_articles_pickup_date ON articles(pickup_date);
-CREATE INDEX idx_articles_return_date ON articles(return_date);
-CREATE INDEX idx_articles_customer    ON articles(customer_name);
+CREATE INDEX idx_articles_article_id   ON articles(article_id);
+CREATE INDEX idx_articles_status       ON articles(status);
+CREATE INDEX idx_articles_category     ON articles(category);
+CREATE INDEX idx_articles_created      ON articles(created_at);
+CREATE INDEX idx_articles_pickup_date  ON articles(pickup_date);
+CREATE INDEX idx_articles_return_date  ON articles(return_date);
+CREATE INDEX idx_articles_customer     ON articles(customer_name);
+CREATE INDEX idx_articles_customer_alt ON articles(customer_alt_phone);
 
 
 CREATE TABLE users (
@@ -135,6 +141,38 @@ CREATE TABLE settings (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE sms_messages (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id     TEXT UNIQUE,
+    customer_phone TEXT NOT NULL,
+    customer_name  TEXT,
+    direction      TEXT NOT NULL DEFAULT 'outbound',
+    message_body   TEXT NOT NULL,
+    status         TEXT DEFAULT 'sent',
+    error_message  TEXT,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_sms_phone     ON sms_messages(customer_phone);
+CREATE INDEX idx_sms_created   ON sms_messages(created_at);
+CREATE INDEX idx_sms_direction ON sms_messages(direction);
+
+CREATE TABLE sms_queue (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id     INTEGER,
+    customer_phone TEXT NOT NULL,
+    customer_name  TEXT,
+    sms_type       TEXT NOT NULL,
+    message_body   TEXT NOT NULL,
+    status         TEXT DEFAULT 'pending',
+    error_message  TEXT,
+    retry_count    INTEGER DEFAULT 0,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_sms_queue_status ON sms_queue(status);
 """
 
 
@@ -254,7 +292,7 @@ def reset_database():
 def print_banner():
     """Display warning header."""
     print("=" * 64)
-    print("        LEHENGA BOOKING — FACTORY RESET UTILITY")
+    print("        RENTAL APP — FACTORY RESET UTILITY")
     print("=" * 64)
     print("This utility will wipe all existing data and reset the app to")
     print("a brand-new, fresh state for a new client or showroom.")

@@ -47,7 +47,7 @@ export function renderHeaderHTML(shopName, currentUser, logoUrl = null) {
               </button>
             </div>
             <p class="brand-sub">
-              <span>LUXURY BRIDAL ATELIER &amp; STUDIO INVENTORY</span>
+              <span>RENTAL BOOKING &amp; INVENTORY SYSTEM</span>
             </p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export function bindHeaderEvents(containerEl, callbacks) {
   if (btnAdd) {
     btnAdd.addEventListener('click', () => {
       const brandTitle = containerEl.querySelector('#brand-shop-name');
-      const currentName = brandTitle ? brandTitle.textContent.trim() : 'Bridal Studio';
+      const currentName = brandTitle ? brandTitle.textContent.trim() : 'Rental Studio';
       openAddArticleModal((newArt) => {
         if (onArticleAdded) onArticleAdded(newArt);
       }, currentName);

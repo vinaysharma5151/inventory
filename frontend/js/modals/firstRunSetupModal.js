@@ -196,7 +196,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
                 id="gate-shop-name"
                 class="setup-input"
                 value="${escapeHtml(currentName)}"
-                placeholder="e.g. Priya Bridal Studio, Riya Collections…"
+                placeholder="e.g. Royal Rentals, City Collections…"
                 maxlength="80"
                 required
                 autocomplete="organization"
@@ -316,7 +316,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
     if (n === 3) {
       // Fill confirm panel
       confirmLogo.src = previewUrl || currentLogoUrl;
-      confirmName.textContent = shopNameInput.value.trim() || 'My Bridal Studio';
+      confirmName.textContent = shopNameInput.value.trim() || 'Rental Studio';
       setTimeout(() => passwordInput?.focus(), 120);
     }
     if (n === 2) {
@@ -374,7 +374,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
 
   // ── Final submit ──
   submitBtn.addEventListener('click', async () => {
-    const shopName = shopNameInput.value.trim() || 'My Bridal Studio';
+    const shopName = shopNameInput.value.trim() || 'Rental Studio';
     const password = passwordInput.value.trim();
 
     errorBox.style.display = 'none';

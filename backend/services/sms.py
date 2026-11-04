@@ -62,7 +62,7 @@ def get_shop_name() -> str:
             return row["value"].strip()
     except Exception as e:
         logger.error(f"[SMS] Failed to load shop name: {e}")
-    return "Bridal Studio"
+    return "Rental Studio"
 
 
 def get_today_sms_count() -> int:
@@ -119,6 +119,10 @@ def save_sms_config(
     try:
         db = get_db()
         cleaned_url = (gateway_url or "").strip().rstrip("/")
+        if cleaned_url.lower().startswith("htpp://"):
+            cleaned_url = "http://" + cleaned_url[7:]
+        elif not cleaned_url.lower().startswith("http://") and not cleaned_url.lower().startswith("https://") and cleaned_url:
+            cleaned_url = f"http://{cleaned_url}"
         pairs = [
             ("sms_gateway_url", cleaned_url),
             ("sms_login", (login or "").strip()),
@@ -161,6 +165,36 @@ def save_sms_message_log(
         return 0
 
 
+def format_sms_collection_item(item: str, category: Optional[str] = None) -> str:
+    """
+    Format collection garment description strictly for SMS templates.
+    Appends 'Lehenga' for Bridal, Reception, and Casual collections only.
+    Leaves other collections (e.g. Sherwani) and pre-existing descriptions intact.
+    """
+    target = (item or "").strip()
+    cat = (category or "").strip()
+    effective = target or cat or "Bridal"
+
+    mapping = {
+        "bridal": "Bridal Lehenga",
+        "reception": "Reception Lehenga",
+        "casual": "Casual Lehenga",
+    }
+
+    eff_lower = effective.lower()
+    if eff_lower in mapping:
+        return mapping[eff_lower]
+
+    if "lehenga" in eff_lower:
+        return effective
+
+    for key in mapping:
+        if eff_lower.endswith(key):
+            return f"{effective} Lehenga"
+
+    return effective
+
+
 def generate_sms_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None) -> str:
     """Generate a clean, compact plain-text SMS e-bill (under standard multi-part limits)."""
     store = (shop_name or get_shop_name()).upper()
@@ -168,7 +202,8 @@ def generate_sms_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = 
     art_id = str(article.get("article_id") or "N/A").strip().lstrip("#")
     raw_title = str(article.get("title") or "").strip()
     category = str(article.get("category") or "Bridal").replace("–", "-").replace("—", "-")
-    item = category if (not raw_title or raw_title.startswith("Booking -") or raw_title.lower() == cust.lower()) else raw_title
+    raw_item = category if (not raw_title or raw_title.startswith("Booking -") or raw_title.lower() == cust.lower()) else raw_title
+    item = format_sms_collection_item(raw_item, category)
 
     pickup = article.get("pickup_date") or "N/A"
     ret_date = article.get("return_date") or "N/A"
@@ -182,11 +217,10 @@ def generate_sms_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = 
         f"{store}: BOOKING {art_id}",
         f"Dear {cust}",
         f"Item: {item}",
-        f"Pickup: {pickup}",
-        f"Return: {ret_date}",
-        f"Total: Rs {price:,.0f}",
-        f"Adv Paid: Rs {adv:,.0f}",
-        f"Bal Due: {bal_str}",
+        f"Pickup: {pickup} | Return: {ret_date}",
+        f"Total: Rs {price:,.0f} (Adv: Rs {adv:,.0f} | Bal: {bal_str})",
+        "- No change or alteration in article once booked.",
+        "- Return on or before due date to avoid Rs 300/day late fee.",
         "Thank you for choosing us!",
     ]
     return "\n".join(lines)
@@ -245,6 +279,8 @@ def send_sms_via_gateway(
         return False, "SMS Gateway URL not configured. Please open SMS Settings.", None
 
     base_url = cfg["gateway_url"]
+    if base_url.lower().startswith("htpp://"):
+        base_url = "http://" + base_url[7:]
     if not base_url.startswith("http://") and not base_url.startswith("https://"):
         base_url = f"http://{base_url}"
 
@@ -266,7 +302,7 @@ def send_sms_via_gateway(
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "MehakBridalStudio-SMS/1.0",
+        "User-Agent": "RentalStudio-SMS/1.0",
     }
 
     if cfg["login"] and cfg["password"]:
@@ -400,14 +436,16 @@ async def check_and_send_due_reminders(db=None) -> Dict[str, Any]:
             WHERE status = 'booked'
               AND TRIM(pickup_date) = ?
               AND (pickup_reminder_sent IS NULL OR pickup_reminder_sent = 0)
-              AND customer_phone IS NOT NULL
-              AND TRIM(customer_phone) != ''
+              AND (
+                  (customer_phone IS NOT NULL AND TRIM(customer_phone) != '')
+                  OR (customer_alt_phone IS NOT NULL AND TRIM(customer_alt_phone) != '')
+              )
             """,
             (tomorrow_str,),
         )
         pickup_rows = [dict(r) for r in cur.fetchall()]
         for art in pickup_rows:
-            clean_phone = format_sms_phone_number(art.get("customer_phone"))
+            clean_phone = format_sms_phone_number(art.get("customer_phone") or art.get("customer_alt_phone"))
             if not clean_phone:
                 continue
             sms_text = generate_sms_reminder_text(art, shop_title)
@@ -454,14 +492,16 @@ async def check_and_send_due_reminders(db=None) -> Dict[str, Any]:
             WHERE status = 'picked_up'
               AND TRIM(return_date) = ?
               AND (return_reminder_sent IS NULL OR return_reminder_sent = 0)
-              AND customer_phone IS NOT NULL
-              AND TRIM(customer_phone) != ''
+              AND (
+                  (customer_phone IS NOT NULL AND TRIM(customer_phone) != '')
+                  OR (customer_alt_phone IS NOT NULL AND TRIM(customer_alt_phone) != '')
+              )
             """,
             (tomorrow_str,),
         )
         return_rows = [dict(r) for r in cur.fetchall()]
         for art in return_rows:
-            clean_phone = format_sms_phone_number(art.get("customer_phone"))
+            clean_phone = format_sms_phone_number(art.get("customer_phone") or art.get("customer_alt_phone"))
             if not clean_phone:
                 continue
             sms_text = generate_sms_return_reminder_text(art, shop_title)

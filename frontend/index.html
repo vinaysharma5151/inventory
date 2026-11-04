@@ -8,14 +8,14 @@
   <meta name="theme-color" content="#F8F9FA">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="description" content="Lehenga Inventory & Studio Booking System">
-  <title>Studio App | Booking & Inventory</title>
+  <meta name="description" content="Rental Inventory & Booking System">
+  <title>Rental Studio | Booking & Inventory</title>
 
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
   <link rel="apple-touch-icon" href="/assets/icon-192.png">
-  <link rel="stylesheet" href="/css/index.css?v=2.3.0">
+  <link rel="stylesheet" href="/css/index.css?v=2.4.0">
   <style>
     @keyframes studioPulse {
 
@@ -43,7 +43,7 @@
     window.addEventListener('error', function (e) {
       var root = document.getElementById('app-root');
       if (root && (!root.children.length || document.getElementById('initial-preloader'))) {
-        var sn = localStorage.getItem('app_shop_name') || 'Studio App';
+        var sn = localStorage.getItem('app_shop_name') || 'Rental Studio';
         root.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:-apple-system,sans-serif;background:#FFFDF9;"><div style="font-size:40px;margin-bottom:12px;">👗</div><h3 style="color:#4A0E17;font-size:17px;margin:0 0 8px;">' + sn + '</h3><p style="font-size:13px;color:#666;max-width:320px;margin-bottom:18px;">Unable to load. Tap reload to refresh.</p><button onclick="location.reload(true)" style="padding:10px 24px;background:#9E7B3B;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">Reload</button></div>';
       }
     });
@@ -63,7 +63,7 @@
         Loading...</div>
     </div>
   </div>
-  <script type="module" src="/js/app.js?v=2.3.0"></script>
+  <script type="module" src="/js/app.js?v=2.4.0"></script>
 </body>
 
 </html>

@@ -19,7 +19,7 @@ const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];
-  let shopName = state.shopName || 'Bridal Studio';
+  let shopName = state.shopName || 'Rental Studio';
   let currentUser = state.currentUser || null;
 
   // Filters State
@@ -120,6 +120,7 @@ export function createDesktopDashboard(containerEl, state) {
               <button type="button" class="filter-chip stage-chip-booked" data-stage="booked" title="Stage 1: Article booked with advance amount given">📌 1. Booked (Advance)</button>
               <button type="button" class="filter-chip stage-chip-picked" data-stage="picked_up" title="Stage 2: Customer picked up article & paid all amount">🛍️ 2. Picked Up (Taken)</button>
               <button type="button" class="filter-chip stage-chip-returned" data-stage="returned" title="Stage 3: Customer returned article back to shop">✅ 3. Returned (Back in Shop)</button>
+              <button type="button" class="filter-chip stage-chip-not-returned" data-stage="not_returned" title="Articles with scheduled return date arrived or passed that have not been returned">⚠️ Not Returned on Date <span class="not-returned-count-badge" id="not-returned-badge" style="display: none;">0</span></button>
             </div>
           </div>
 
@@ -305,21 +306,43 @@ export function createDesktopDashboard(containerEl, state) {
     if (elLeft) elLeft.textContent = `₹${formatINR(paymentLeft)}`;
   };
 
+  // Live Counter for unreturned articles past or on return date
+  const updateNotReturnedBadge = () => {
+    const today = getTodayISO(0);
+    const overdueCount = articles.filter((item) => {
+      const st = (item.status || 'booked').toLowerCase();
+      return st !== 'returned' && Boolean(item.return_date && item.return_date.trim() <= today);
+    }).length;
+    const badge = containerEl.querySelector('#not-returned-badge');
+    if (badge) {
+      if (overdueCount > 0) {
+        badge.textContent = overdueCount;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  };
+
   // Render Grid
   const renderGrid = () => {
+    updateNotReturnedBadge();
     const filteredList = filterArticles(articles, filterState);
     updateMetrics(filteredList);
 
     if (filteredList.length === 0) {
       gridContainer.className = '';
+      const isNotReturnedFilter = filterState.stageFilter === 'not_returned' || filterState.stageFilter === 'overdue';
       gridContainer.innerHTML = `
         <div class="empty-catalog-card">
-          <div class="empty-icon">👗</div>
-          <h3 class="empty-title">No Lehengas Found</h3>
+          <div class="empty-icon">${isNotReturnedFilter ? '✅' : '👗'}</div>
+          <h3 class="empty-title">${isNotReturnedFilter ? 'No Overdue Returns' : 'No Lehengas Found'}</h3>
           <p class="empty-sub">
-            ${articles.length === 0
-              ? 'Scan the QR code with a studio phone to photograph and register new bookings!'
-              : 'No articles match your current search, date, or filter criteria.'}
+            ${isNotReturnedFilter
+              ? 'Great! All garments have been returned back on time, or have scheduled return dates in the future.'
+              : (articles.length === 0
+                ? 'Scan the QR code with a studio phone to photograph and register new bookings!'
+                : 'No articles match your current search, date, or filter criteria.')}
           </p>
           <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
             <button type="button" id="btn-empty-qr" class="btn btn-gold btn-sm">

@@ -148,12 +148,13 @@ def sms_ebill_text(
     article = dict(row)
     shop_title = get_shop_name()
     text = generate_sms_ebill_text(article, shop_title)
-    clean_phone = format_sms_phone_number(article.get("customer_phone"))
+    clean_phone = format_sms_phone_number(article.get("customer_phone") or article.get("customer_alt_phone"))
 
     return {
         "success": True,
         "article_id": article_id,
         "customer_phone": article.get("customer_phone"),
+        "customer_alt_phone": article.get("customer_alt_phone"),
         "formatted_phone": clean_phone,
         "sms_text": text,
     }
@@ -174,7 +175,7 @@ async def sms_send_article(
     article = dict(row)
     target_phone = (
         payload.phone_override if payload and payload.phone_override else None
-    ) or article.get("customer_phone")
+    ) or article.get("customer_phone") or article.get("customer_alt_phone")
 
     if not target_phone:
         raise HTTPException(
@@ -234,12 +235,13 @@ def sms_reminder_text(
     article = dict(row)
     shop_title = get_shop_name()
     text = generate_sms_reminder_text(article, shop_title)
-    clean_phone = format_sms_phone_number(article.get("customer_phone"))
+    clean_phone = format_sms_phone_number(article.get("customer_phone") or article.get("customer_alt_phone"))
 
     return {
         "success": True,
         "article_id": article_id,
         "customer_phone": article.get("customer_phone"),
+        "customer_alt_phone": article.get("customer_alt_phone"),
         "formatted_phone": clean_phone,
         "sms_text": text,
     }
@@ -260,7 +262,7 @@ async def sms_send_reminder(
     article = dict(row)
     target_phone = (
         payload.phone_override if payload and payload.phone_override else None
-    ) or article.get("customer_phone")
+    ) or article.get("customer_phone") or article.get("customer_alt_phone")
 
     if not target_phone:
         raise HTTPException(status_code=400, detail="No customer phone number found.")
@@ -327,12 +329,13 @@ def sms_return_reminder_text(
     article = dict(row)
     shop_title = get_shop_name()
     text = generate_sms_return_reminder_text(article, shop_title)
-    clean_phone = format_sms_phone_number(article.get("customer_phone"))
+    clean_phone = format_sms_phone_number(article.get("customer_phone") or article.get("customer_alt_phone"))
 
     return {
         "success": True,
         "article_id": article_id,
         "customer_phone": article.get("customer_phone"),
+        "customer_alt_phone": article.get("customer_alt_phone"),
         "formatted_phone": clean_phone,
         "sms_text": text,
     }
@@ -353,7 +356,7 @@ async def sms_send_return_reminder(
     article = dict(row)
     target_phone = (
         payload.phone_override if payload and payload.phone_override else None
-    ) or article.get("customer_phone")
+    ) or article.get("customer_phone") or article.get("customer_alt_phone")
 
     if not target_phone:
         raise HTTPException(status_code=400, detail="No customer phone number found.")

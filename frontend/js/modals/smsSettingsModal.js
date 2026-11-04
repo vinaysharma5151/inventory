@@ -10,7 +10,7 @@
 import { openModal, closeModal } from '../modal.js';
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
-import { showToast } from '../toast.js';
+import { showToast, playMessageSentChime } from '../toast.js';
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -255,6 +255,7 @@ export async function openSmsSettingsModal(onSaved) {
     try {
       const res = await api.testSmsGateway(phone);
       if (res && res.success) {
+        playMessageSentChime();
         feedbackEl.style.display = 'block';
         feedbackEl.style.background = '#ECFDF5';
         feedbackEl.style.border = '1px solid #A7F3D0';

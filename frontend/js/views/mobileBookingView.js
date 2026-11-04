@@ -10,6 +10,7 @@
 
 import { renderIcon } from '../icons.js';
 import { api } from '../api.js';
+import { playLiveSyncChime } from '../toast.js';
 import { initMobileCamera } from './mobile/mobileCamera.js';
 import { initPaymentCalculator } from './mobile/paymentCalculator.js';
 import { initSubmitOverlay } from './mobile/mobileSubmitOverlay.js';
@@ -30,7 +31,7 @@ const getISODate = (offsetDays = 0) => {
 };
 
 export function createMobileBookingView(containerEl, state) {
-  let shopName = state.shopName || 'Bridal Studio';
+  let shopName = state.shopName || 'Rental Studio';
   let logoUrl = state.logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
   let category = 'Bridal';
   let pickupDate = getISODate(2);
@@ -280,7 +281,15 @@ export function createMobileBookingView(containerEl, state) {
                 <label class="input-label" for="m-cust-phone">Customer Phone Number</label>
                 <div class="input-with-icon">
                   <span class="field-icon">${renderIcon('phone', { size: 16 })}</span>
-                  <input type="tel" id="m-cust-phone" class="input-field font-mono" placeholder="e.g. 98765 43210" />
+                  <input type="tel" id="m-cust-phone" class="input-field font-mono" placeholder="e.g. 98765 43210" autocomplete="tel" />
+                </div>
+              </div>
+
+              <div>
+                <label class="input-label" for="m-cust-alt-phone">Alternative No. (Optional)</label>
+                <div class="input-with-icon">
+                  <span class="field-icon">${renderIcon('phone', { size: 16 })}</span>
+                  <input type="tel" id="m-cust-alt-phone" class="input-field font-mono" placeholder="e.g. 98765 12345" autocomplete="tel" />
                 </div>
               </div>
 
@@ -324,6 +333,7 @@ export function createMobileBookingView(containerEl, state) {
     const refreshIdBtn = containerEl.querySelector('#btn-refresh-mid');
     const custNameInput = containerEl.querySelector('#m-cust-name');
     const custPhoneInput = containerEl.querySelector('#m-cust-phone');
+    const custAltPhoneInput = containerEl.querySelector('#m-cust-alt-phone');
     const custAddrInput = containerEl.querySelector('#m-cust-addr');
     const priceInput = containerEl.querySelector('#m-price-input');
     const submitBtn = containerEl.querySelector('#btn-submit-booking');
@@ -474,6 +484,7 @@ export function createMobileBookingView(containerEl, state) {
       paymentController?.reset();
       custNameInput.value = '';
       custPhoneInput.value = '';
+      if (custAltPhoneInput) custAltPhoneInput.value = '';
       custAddrInput.value = '';
       fetchNextId();
       updateSubmitState();
@@ -511,6 +522,7 @@ export function createMobileBookingView(containerEl, state) {
       formData.append('jewellery_price', jewelPrice);
       formData.append('customer_name', name);
       formData.append('customer_phone', custPhoneInput.value.trim());
+      formData.append('customer_alt_phone', custAltPhoneInput ? custAltPhoneInput.value.trim() : '');
       formData.append('customer_address', custAddrInput.value.trim());
       formData.append('pickup_date', pickupInput.value);
       formData.append('return_date', returnInput.value);
@@ -521,6 +533,7 @@ export function createMobileBookingView(containerEl, state) {
       try {
         const res = await api.uploadArticle(formData);
         if (res.success) {
+          playLiveSyncChime();
           if (state.onBookingCreated) state.onBookingCreated(res.article);
           overlayController.showSuccess(res.article, resetForm);
         } else {

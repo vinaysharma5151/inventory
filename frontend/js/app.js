@@ -10,7 +10,7 @@
  */
 
 import { api } from './api.js?v=11';
-import { playLiveSyncChime, showToast } from './toast.js';
+import { playLiveSyncChime, playMessageSentChime, showToast } from './toast.js';
 import { createDesktopDashboard } from './views/desktopDashboard.js?v=15';
 import { createMobileBookingView } from './views/mobileBookingView.js?v=15';
 import { openLoginModal } from './modals/loginModal.js';
@@ -317,6 +317,7 @@ class App {
         }
       } else if (event.type === 'SMS_SENT' && event.data) {
         const d = event.data;
+        playMessageSentChime();
         const typeStr = d.type || 'SMS Message';
         const recipStr = d.recipient ? ` to ${d.recipient}` : '';
         const phoneStr = d.phone ? ` (${d.phone})` : '';

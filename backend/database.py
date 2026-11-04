@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS articles (
     source           TEXT    DEFAULT 'phone',
     customer_name    TEXT,
     customer_phone   TEXT,
+    customer_alt_phone TEXT,
     customer_address TEXT,
     pickup_date      TEXT,
     booking_date     TEXT,
@@ -196,6 +197,7 @@ CREATE INDEX IF NOT EXISTS idx_sms_queue_status ON sms_queue(status);
 _MIGRATE_COLUMNS = {
     "customer_name":     "TEXT",
     "customer_phone":    "TEXT",
+    "customer_alt_phone": "TEXT",
     "customer_address":  "TEXT",
     "pickup_date":       "TEXT",
     "booking_date":      "TEXT",
@@ -233,6 +235,7 @@ def init_db() -> None:
     # Ensure all rows have a valid stage/status
     db.execute("UPDATE articles SET status = 'booked' WHERE status IS NULL OR TRIM(status) = ''")
     db.execute("CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_articles_customer_alt ON articles(customer_alt_phone)")
 
     # Migrate: drop obsolete color and size columns if present
     if "color" in existing_cols:

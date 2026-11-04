@@ -47,6 +47,11 @@ export function createArticleCard(item, context) {
       : 'Customer'
   );
 
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const stLower = (item.status || 'booked').toLowerCase();
+  const isPastReturn = Boolean(item.return_date && item.return_date.trim() < todayISO && stLower !== 'returned');
+  const isReturnToday = Boolean(item.return_date && item.return_date.trim() === todayISO && stLower !== 'returned');
+
   const hasDistinctOutfit = Boolean(
     item.title &&
     !item.title.startsWith('Booking –') &&
@@ -83,6 +88,12 @@ export function createArticleCard(item, context) {
           ${escapeHtml(item.article_id)}
         </span>
         <span class="badge badge-neutral">${escapeHtml(item.category || 'Bridal')}</span>
+        ${isPastReturn ? `
+          <span class="badge" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; font-weight: 700; font-size: 0.7rem;">⚠️ Return Overdue</span>
+        ` : ''}
+        ${isReturnToday ? `
+          <span class="badge" style="background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; font-weight: 700; font-size: 0.7rem;">⏰ Due Today</span>
+        ` : ''}
       </div>
 
       <div class="card-header-block">
@@ -90,11 +101,16 @@ export function createArticleCard(item, context) {
           ${escapeHtml(personDisplayName)}
         </h3>
 
-        ${(item.customer_phone || hasDistinctOutfit || hasJewel) ? `
+        ${(item.customer_phone || item.customer_alt_phone || hasDistinctOutfit || hasJewel) ? `
           <div class="card-customer-meta">
             ${item.customer_phone ? `
               <span class="phone-chip font-mono" title="Customer Phone">
                 📞 ${escapeHtml(item.customer_phone)}
+              </span>
+            ` : ''}
+            ${item.customer_alt_phone ? `
+              <span class="phone-chip font-mono" title="Alternative Phone">
+                📞 Alt: ${escapeHtml(item.customer_alt_phone)}
               </span>
             ` : ''}
             ${hasDistinctOutfit ? `
@@ -122,7 +138,7 @@ export function createArticleCard(item, context) {
             </div>
           ` : ''}
           ${item.return_date ? `
-            <div class="card-date-item card-date-return" title="Customer Return Back Date">
+            <div class="card-date-item card-date-return ${isPastReturn ? 'card-date-overdue' : (isReturnToday ? 'card-date-due-today' : '')}" title="Customer Return Back Date${isPastReturn ? ' (OVERDUE)' : (isReturnToday ? ' (DUE TODAY)' : '')}">
               <span class="card-date-label">
                 ${renderIcon('rotateCcw', { size: 12 })} Return:
               </span>

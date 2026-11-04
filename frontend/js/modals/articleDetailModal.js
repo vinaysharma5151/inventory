@@ -29,10 +29,10 @@ function escapeHtml(str) {
 /**
  * Opens the article detail modal.
  * @param {object} article - Full article object
- * @param {string} [shopName='Bridal Studio'] - Boutique name
+ * @param {string} [shopName='Rental Studio'] - Boutique name
  * @param {object} [callbacks] - { onUpdate, onDelete }
  */
-export function openArticleDetailModal(article, shopName = 'Bridal Studio', { onUpdate, onDelete, currentUser } = {}) {
+export function openArticleDetailModal(article, shopName = 'Rental Studio', { onUpdate, onDelete, currentUser } = {}) {
   if (!article) return;
 
   const numPrice = Number(article.price) || 0;
@@ -251,7 +251,16 @@ export function openArticleDetailModal(article, shopName = 'Bridal Studio', { on
                     <a href="tel:${escapeHtml(article.customer_phone)}" style="color: #8C6A2A; text-decoration: none; font-weight: 600;">
                       ${escapeHtml(article.customer_phone)}
                     </a>
-                  ` : 'N/A'}
+                  ` : (article.customer_alt_phone ? `
+                    <a href="tel:${escapeHtml(article.customer_alt_phone)}" style="color: #8C6A2A; text-decoration: none; font-weight: 600;">
+                      ${escapeHtml(article.customer_alt_phone)}
+                    </a>
+                  ` : 'N/A')}
+                  ${article.customer_phone && article.customer_alt_phone ? `
+                    <span style="font-size: 0.8rem; color: var(--text-muted, #71717A); font-weight: normal; margin-left: 6px;">
+                      | Alt: <a href="tel:${escapeHtml(article.customer_alt_phone)}" style="color: #8C6A2A; text-decoration: none; font-weight: 600;">${escapeHtml(article.customer_alt_phone)}</a>
+                    </span>
+                  ` : ''}
                 </span>
               </div>
             </div>
@@ -297,7 +306,7 @@ export function openArticleDetailModal(article, shopName = 'Bridal Studio', { on
         </div>
 
         <div class="footer-actions-right">
-          ${article.customer_phone ? `
+          ${(article.customer_phone || article.customer_alt_phone) ? `
             <button type="button" class="btn btn-sms btn-sm btn-send-sms" title="Send Plain Text SMS Bill via SIM">
               ${renderIcon('messageSquare', { size: 15 })} SMS Bill
             </button>

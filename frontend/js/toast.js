@@ -13,38 +13,144 @@ import { renderIcon } from './icons.js';
 let sharedAudioCtx = null;
 
 /**
- * Plays a pleasant luxury chime (D5 -> A5 ascending tones) using Web Audio API.
- * Uses a singleton AudioContext to prevent memory leaks or audio node exhaustion.
+ * Returns or creates the singleton AudioContext.
+ * Ensures the context is resumed from suspended state.
  */
-export function playLiveSyncChime() {
+function getAudioContext() {
   try {
     if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtxClass) return;
+      if (!AudioCtxClass) return null;
       sharedAudioCtx = new AudioCtxClass();
     }
     if (sharedAudioCtx.state === 'suspended') {
       sharedAudioCtx.resume().catch(() => {});
     }
-
-    const ctx = sharedAudioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 (587.33 Hz)
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5 (880 Hz)
-
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
+    return sharedAudioCtx;
   } catch (_) {
-    // Audio autoplays might be muted by browser until user interacts with page
+    return null;
+  }
+}
+
+// Unlocks browser audio on first user gesture anywhere on the window
+if (typeof window !== 'undefined') {
+  const unlockAudioContext = () => {
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (_) {}
+    window.removeEventListener('click', unlockAudioContext);
+    window.removeEventListener('keydown', unlockAudioContext);
+    window.removeEventListener('pointerdown', unlockAudioContext);
+    window.removeEventListener('touchstart', unlockAudioContext);
+  };
+  window.addEventListener('click', unlockAudioContext, { once: true, passive: true });
+  window.addEventListener('keydown', unlockAudioContext, { once: true, passive: true });
+  window.addEventListener('pointerdown', unlockAudioContext, { once: true, passive: true });
+  window.addEventListener('touchstart', unlockAudioContext, { once: true, passive: true });
+}
+
+/**
+ * Helper to play a harmonic bell note with fundamental and overtone.
+ */
+function playHarmonicBell(ctx, destination, freq, startTime, duration, volume = 0.4) {
+  // Fundamental tone
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(freq, startTime);
+
+  gain1.gain.setValueAtTime(0.0001, startTime);
+  gain1.gain.linearRampToValueAtTime(volume, startTime + 0.015);
+  gain1.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  osc1.connect(gain1);
+  gain1.connect(destination);
+  osc1.start(startTime);
+  osc1.stop(startTime + duration);
+
+  // Subtle overtone (sparkle harmonic at 2x frequency)
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(freq * 2, startTime);
+
+  gain2.gain.setValueAtTime(0.0001, startTime);
+  gain2.gain.linearRampToValueAtTime(volume * 0.25, startTime + 0.012);
+  gain2.gain.exponentialRampToValueAtTime(0.0001, startTime + (duration * 0.55));
+
+  osc2.connect(gain2);
+  gain2.connect(destination);
+  osc2.start(startTime);
+  osc2.stop(startTime + (duration * 0.55));
+}
+
+/**
+ * Plays a rich, pleasant luxury chime (E5 -> A5 ascending notes)
+ * when new data / booking is captured on a phone.
+ */
+export function playLiveSyncChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.55, now);
+    master.connect(ctx.destination);
+
+    // Note 1: E5 (659.25 Hz)
+    playHarmonicBell(ctx, master, 659.25, now, 0.42, 0.35);
+
+    // Note 2: A5 (880.00 Hz) — arrives 140ms later with lingering ring
+    playHarmonicBell(ctx, master, 880.00, now + 0.14, 0.65, 0.40);
+  } catch (_) {
+    // Graceful ignore if audio unavailable
+  }
+}
+
+/**
+ * Plays a swift, cheerful confirmation chime (ascending swoosh + high C6 ping)
+ * when a message (SMS / bill notification) is sent.
+ */
+export function playMessageSentChime() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.50, now);
+    master.connect(ctx.destination);
+
+    // 1. Upward whoosh tone (G5 -> C6)
+    const oscGlide = ctx.createOscillator();
+    const gainGlide = ctx.createGain();
+    oscGlide.type = 'sine';
+    oscGlide.frequency.setValueAtTime(783.99, now); // G5
+    oscGlide.frequency.exponentialRampToValueAtTime(1046.50, now + 0.08); // C6
+
+    gainGlide.gain.setValueAtTime(0.0001, now);
+    gainGlide.gain.linearRampToValueAtTime(0.32, now + 0.03);
+    gainGlide.gain.exponentialRampToValueAtTime(0.0001, now + 0.10);
+
+    oscGlide.connect(gainGlide);
+    gainGlide.connect(master);
+    oscGlide.start(now);
+    oscGlide.stop(now + 0.10);
+
+    // 2. High confirmation bell ping at C6 (1046.50 Hz)
+    playHarmonicBell(ctx, master, 1046.50, now + 0.07, 0.45, 0.40);
+  } catch (_) {
+    // Graceful ignore if audio unavailable
   }
 }
 

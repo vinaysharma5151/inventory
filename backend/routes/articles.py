@@ -82,9 +82,10 @@ def list_articles(
             title LIKE ? OR
             customer_name LIKE ? OR
             customer_phone LIKE ? OR
+            customer_alt_phone LIKE ? OR
             salesman_name LIKE ?
         )"""
-        params.extend([search_pattern] * 5)
+        params.extend([search_pattern] * 6)
 
     if category and category.lower() != "all":
         query += " AND category = ?"
@@ -95,8 +96,12 @@ def list_articles(
         params.append(salesman)
 
     if stage and stage.lower() != "all":
-        query += " AND status = ?"
-        params.append(stage.lower())
+        st_clean = stage.lower().strip()
+        if st_clean in ("not_returned", "overdue"):
+            query += " AND status != 'returned' AND return_date IS NOT NULL AND TRIM(return_date) != '' AND TRIM(return_date) <= date('now', 'localtime')"
+        else:
+            query += " AND status = ?"
+            params.append(st_clean)
 
     query += " ORDER BY created_at DESC"
     rows = db.execute(query, params).fetchall()
@@ -139,6 +144,7 @@ async def create_article(
     source:           Optional[str]   = Form("phone"),
     customer_name:    Optional[str]   = Form(None),
     customer_phone:   Optional[str]   = Form(None),
+    customer_alt_phone: Optional[str] = Form(None),
     customer_address: Optional[str]   = Form(None),
     pickup_date:      Optional[str]   = Form(None),
     booking_date:     Optional[str]   = Form(None),
@@ -206,10 +212,10 @@ async def create_article(
         """INSERT INTO articles
            (article_id, title, category, price, security_deposit,
             advance_amount, balance_amount, notes,
-            image_path, source, customer_name, customer_phone, customer_address,
+            image_path, source, customer_name, customer_phone, customer_alt_phone, customer_address,
             pickup_date, booking_date, return_date, salesman_name,
             status, has_jewellery, jewellery_details, jewellery_price)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             final_id,
             final_title,
@@ -223,6 +229,7 @@ async def create_article(
             source or "phone",
             customer_name or None,
             customer_phone or None,
+            customer_alt_phone or None,
             customer_address or None,
             pickup_date or None,
             booking_date or None,
@@ -253,7 +260,7 @@ async def create_article(
     await broadcast("NEW_ARTICLE", article)
 
     # Immediately auto-dispatch booking SMS e-bill upon booking submission
-    cust_phone = article.get("customer_phone")
+    cust_phone = article.get("customer_phone") or article.get("customer_alt_phone")
     if cust_phone:
         try:
             clean_phone = format_sms_phone_number(cust_phone)
@@ -315,7 +322,7 @@ async def update_article(
     allowed = {
         "article_id", "title", "category", "price", "security_deposit",
         "advance_amount", "balance_amount", "notes",
-        "customer_name", "customer_phone", "customer_address", "pickup_date", "booking_date",
+        "customer_name", "customer_phone", "customer_alt_phone", "customer_address", "pickup_date", "booking_date",
         "return_date", "salesman_name", "status",
         "has_jewellery", "jewellery_details", "jewellery_price",
     }

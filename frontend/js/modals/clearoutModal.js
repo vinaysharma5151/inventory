@@ -81,6 +81,7 @@ export function openClearoutModal(article, onSuccess) {
             <div class="clearout-meta-row">
               <span class="clearout-customer-tag">👤 ${escapeHtml(article.customer_name || 'Guest')}</span>
               ${article.customer_phone ? `<span class="clearout-phone-tag">📞 ${escapeHtml(article.customer_phone)}</span>` : ''}
+              ${article.customer_alt_phone ? `<span class="clearout-phone-tag">📞 Alt: ${escapeHtml(article.customer_alt_phone)}</span>` : ''}
               ${article.return_date ? `<span class="clearout-return-tag">Return: ${escapeHtml(article.return_date)}</span>` : ''}
             </div>
           </div>

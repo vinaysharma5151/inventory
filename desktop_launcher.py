@@ -90,7 +90,7 @@ def main():
     # Pre-check: If port 8000 is already active, another instance is running
     if is_port_in_use(8000):
         print("=" * 65)
-        print("   BRIDAL STUDIO APP — ALREADY RUNNING")
+        print("   RENTAL STUDIO APP — ALREADY RUNNING")
         print("=" * 65)
         print("  The server is already running in another window on this PC.")
         print("  Opening your browser now: http://localhost:8000")
@@ -106,7 +106,7 @@ def main():
     local_ip = get_local_ip()
 
     # Read configured shop name from DB if available
-    display_title = "BRIDAL STUDIO"
+    display_title = "RENTAL STUDIO"
     try:
         import sqlite3
         if DB_PATH.exists():
