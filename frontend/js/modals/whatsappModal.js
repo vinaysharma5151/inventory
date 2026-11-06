@@ -162,7 +162,7 @@ export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio',
         modeBadge.textContent = `● OpenWA (${status.push_name || status.session_name || 'Ready'})`;
         modeBadge.style.background = '#25D366';
         modeBadge.style.color = '#FFFFFF';
-      } else if (status && status.has_api_key) {
+      } else if (status && status.session_id) {
         modeBadge.textContent = '● Connecting...';
         modeBadge.style.background = '#F59E0B';
         modeBadge.style.color = '#FFFFFF';

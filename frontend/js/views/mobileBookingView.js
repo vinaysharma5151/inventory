@@ -400,6 +400,7 @@ export function createMobileBookingView(containerEl, state) {
     const custAltPhoneInput = containerEl.querySelector('#m-cust-alt-phone');
     const custAddrInput = containerEl.querySelector('#m-cust-addr');
     const priceInput = containerEl.querySelector('#m-price-input');
+    const advanceInput = containerEl.querySelector('#m-advance-input');
     const submitBtn = containerEl.querySelector('#btn-submit-booking');
     const submitLabel = containerEl.querySelector('#m-submit-label');
 
@@ -556,116 +557,126 @@ export function createMobileBookingView(containerEl, state) {
     // Load an existing article's data into the form for editing
     const loadArticleForEditing = (article) => {
       if (!article) return;
-      editingArticle = article;
+      try {
+        editingArticle = article;
 
-      // 1. Show Edit Mode Banner
-      if (editBanner && editBannerId) {
-        editBannerId.textContent = `#${article.article_id}`;
-        editBanner.style.display = 'flex';
-      }
-
-      // 2. Populate Article ID
-      articleIdInput.value = article.article_id || '';
-
-      // 3. Populate Dates
-      if (article.pickup_date) {
-        pickupDate = article.pickup_date;
-        pickupInput.value = article.pickup_date;
-      }
-      if (article.return_date) {
-        returnDate = article.return_date;
-        returnInput.value = article.return_date;
-      }
-
-      // 4. Populate Category
-      category = article.category || 'Bridal';
-      containerEl.querySelectorAll('#m-category-chips .category-chip').forEach((btn) => {
-        if ((btn.dataset.cat || '').toLowerCase() === (category || '').toLowerCase()) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
+        // 1. Show Edit Mode Banner
+        if (editBanner && editBannerId) {
+          editBannerId.textContent = `#${article.article_id}`;
+          editBanner.style.display = 'flex';
         }
-      });
 
-      // 5. Populate Jewellery
-      const hasJewel = Number(article.has_jewellery || 0) === 1;
-      jewelToggle.checked = hasJewel;
-      jewelPriceInput.value = hasJewel ? (article.jewellery_price || 0) : 0;
-      const jewelDesc = article.jewellery_details || 'Full Bridal Set';
-      jewelDescInput.value = jewelDesc;
-      jewelChips.forEach((btn) => {
-        if (btn.dataset.val === jewelDesc) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
+        // 2. Populate Article ID
+        if (articleIdInput) {
+          articleIdInput.value = article.article_id || '';
         }
-      });
-      updateJewelState();
 
-      // 6. Populate Pricing & Advance
-      const totalArticlePrice = parseFloat(article.price) || 0;
-      const jPrice = hasJewel ? (parseFloat(article.jewellery_price) || 0) : 0;
-      const garmentP = Math.max(0, totalArticlePrice - jPrice);
-      priceInput.value = garmentP > 0 ? garmentP : totalArticlePrice;
-      advanceInput.value = (article.advance_amount !== undefined && article.advance_amount !== null) ? article.advance_amount : 0;
-      paymentController?.update();
-
-      // 7. Populate Customer Details
-      const personName = (article.customer_name || '').trim();
-      custNameInput.value = personName;
-      custNameInput.dispatchEvent(new Event('input', { bubbles: true }));
-      custNameInput.dispatchEvent(new Event('change', { bubbles: true }));
-      custNameInput.classList.remove('highlight-pulse');
-      void custNameInput.offsetWidth;
-      custNameInput.classList.add('highlight-pulse');
-
-      custPhoneInput.value = article.customer_phone || '';
-      if (custAltPhoneInput) custAltPhoneInput.value = article.customer_alt_phone || '';
-      custAddrInput.value = article.customer_address || article.notes || '';
-
-      // Update Search Card Customer / Person Name Result Box
-      const searchNameResult = containerEl.querySelector('#m-search-name-result');
-      const searchNameValue = containerEl.querySelector('#m-search-name-value');
-      if (searchNameResult && searchNameValue) {
-        searchNameValue.textContent = personName || 'Guest / Unnamed Booking';
-        searchNameResult.style.display = 'flex';
-      }
-
-      // Update Edit Banner Name Badge
-      const editCustBadge = containerEl.querySelector('#m-edit-banner-cust-badge');
-      if (editCustBadge) {
-        if (personName) {
-          editCustBadge.textContent = personName;
-          editCustBadge.style.display = 'inline-block';
-        } else {
-          editCustBadge.style.display = 'none';
+        // 3. Populate Dates
+        if (article.pickup_date) {
+          pickupDate = article.pickup_date;
+          if (pickupInput) pickupInput.value = article.pickup_date;
         }
-      }
+        if (article.return_date) {
+          returnDate = article.return_date;
+          if (returnInput) returnInput.value = article.return_date;
+        }
 
-      // Sync search input if invoked from article ID field
-      if (searchInput && article.article_id) {
-        searchInput.value = article.article_id;
-        if (searchClearBtn) searchClearBtn.style.display = 'flex';
-      }
+        // 4. Populate Category
+        category = article.category || 'Bridal';
+        containerEl.querySelectorAll('#m-category-chips .category-chip').forEach((btn) => {
+          if ((btn.dataset.cat || '').toLowerCase() === (category || '').toLowerCase()) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
 
-      // 8. Populate Garment Photo (Show existing image in preview)
-      if (article.image_path) {
-        cameraController?.showExistingPhoto(article.image_path);
-      }
+        // 5. Populate Jewellery
+        const hasJewel = Number(article.has_jewellery || 0) === 1;
+        if (jewelToggle) jewelToggle.checked = hasJewel;
+        if (jewelPriceInput) jewelPriceInput.value = hasJewel ? (article.jewellery_price || 0) : 0;
+        const jewelDesc = article.jewellery_details || 'Full Bridal Set';
+        if (jewelDescInput) jewelDescInput.value = jewelDesc;
+        jewelChips.forEach((btn) => {
+          if (btn.dataset.val === jewelDesc) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+        updateJewelState();
 
-      // 9. Status feedback
-      showSearchStatus(`✓ Loaded Article ${article.article_id} (${personName || 'Guest'})`, 'success');
-      showToast(`Loaded ${personName ? personName + ' — ' : ''}Article #${article.article_id}`, 'success', 2500);
+        // 6. Populate Pricing & Advance
+        const totalArticlePrice = parseFloat(article.price) || 0;
+        const jPrice = hasJewel ? (parseFloat(article.jewellery_price) || 0) : 0;
+        const garmentP = Math.max(0, totalArticlePrice - jPrice);
+        if (priceInput) priceInput.value = garmentP > 0 ? garmentP : totalArticlePrice;
+        if (advanceInput) {
+          advanceInput.value = (article.advance_amount !== undefined && article.advance_amount !== null) ? article.advance_amount : 0;
+        }
+        paymentController?.update();
 
-      // 10. Update submit button
-      updateSubmitState();
-
-      // Smoothly scroll directly to the Customer Name field so the user sees it filled immediately
-      setTimeout(() => {
+        // 7. Populate Customer Details
+        const personName = (article.customer_name || '').trim();
         if (custNameInput) {
-          custNameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          custNameInput.value = personName;
+          custNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+          custNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+          custNameInput.classList.remove('highlight-pulse');
+          void custNameInput.offsetWidth;
+          custNameInput.classList.add('highlight-pulse');
         }
-      }, 120);
+
+        if (custPhoneInput) custPhoneInput.value = article.customer_phone || '';
+        if (custAltPhoneInput) custAltPhoneInput.value = article.customer_alt_phone || '';
+        if (custAddrInput) custAddrInput.value = article.customer_address || article.notes || '';
+
+        // Update Search Card Customer / Person Name Result Box
+        const searchNameResult = containerEl.querySelector('#m-search-name-result');
+        const searchNameValue = containerEl.querySelector('#m-search-name-value');
+        if (searchNameResult && searchNameValue) {
+          searchNameValue.textContent = personName || 'Guest / Unnamed Booking';
+          searchNameResult.style.display = 'flex';
+        }
+
+        // Update Edit Banner Name Badge
+        const editCustBadge = containerEl.querySelector('#m-edit-banner-cust-badge');
+        if (editCustBadge) {
+          if (personName) {
+            editCustBadge.textContent = personName;
+            editCustBadge.style.display = 'inline-block';
+          } else {
+            editCustBadge.style.display = 'none';
+          }
+        }
+
+        // Sync search input if invoked from article ID field
+        if (searchInput && article.article_id) {
+          searchInput.value = article.article_id;
+          if (searchClearBtn) searchClearBtn.style.display = 'flex';
+        }
+
+        // 8. Populate Garment Photo (Show existing image in preview)
+        if (article.image_path) {
+          cameraController?.showExistingPhoto(article.image_path);
+        }
+
+        // 9. Status feedback
+        showSearchStatus(`✓ Loaded Article #${article.article_id} (${personName || 'Guest'})`, 'success');
+        showToast(`Loaded ${personName ? personName + ' — ' : ''}Article #${article.article_id}`, 'success', 2500);
+
+        // 10. Update submit button
+        updateSubmitState();
+
+        // Smoothly scroll directly to the Customer Name field so the user sees it filled immediately
+        setTimeout(() => {
+          if (custNameInput) {
+            custNameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 120);
+      } catch (err) {
+        console.error('Error populating form for editing:', err);
+      }
     };
 
     // Exit Edit Mode and revert form to New Booking
@@ -678,6 +689,7 @@ export function createMobileBookingView(containerEl, state) {
       if (searchNameResult) searchNameResult.style.display = 'none';
       if (searchInput) searchInput.value = '';
       if (searchClearBtn) searchClearBtn.style.display = 'none';
+      if (advanceInput) advanceInput.value = '';
       hideSearchStatus();
       resetForm();
     };
@@ -717,6 +729,7 @@ export function createMobileBookingView(containerEl, state) {
           showSearchStatus(`Article "${query}" not found in database.`, 'error');
         }
       } catch (err) {
+        console.error('Search article failed:', err);
         showSearchStatus(`Article "${query}" not found in database.`, 'error');
       } finally {
         if (searchSubmitBtn) {
@@ -811,19 +824,8 @@ export function createMobileBookingView(containerEl, state) {
 
       if (editingArticle) {
         submitBtn.classList.add('editing');
-        if (!hasPhoto) {
-          submitLabel.textContent = 'Take Garment Photo';
-          submitBtn.disabled = true;
-        } else if (!hasPrice) {
-          submitLabel.textContent = 'Enter Garment Price';
-          submitBtn.disabled = true;
-        } else if (!hasCustomer) {
-          submitLabel.textContent = 'Enter Customer Name';
-          submitBtn.disabled = true;
-        } else {
-          submitLabel.textContent = `Update Article ${editingArticle.article_id} →`;
-          submitBtn.disabled = false;
-        }
+        submitBtn.disabled = false;
+        submitLabel.textContent = `Update Article #${editingArticle.article_id} →`;
       } else {
         submitBtn.classList.remove('editing');
         if (!hasPhoto) {
@@ -864,6 +866,7 @@ export function createMobileBookingView(containerEl, state) {
       custPhoneInput.value = '';
       if (custAltPhoneInput) custAltPhoneInput.value = '';
       custAddrInput.value = '';
+      if (advanceInput) advanceInput.value = '';
       fetchNextId();
       updateSubmitState();
     };
@@ -882,36 +885,62 @@ export function createMobileBookingView(containerEl, state) {
           : photoBlob
       );
 
-      if (!hasPhoto || p <= 0 || !name) return;
-
-      const hasJewel = jewelToggle.checked ? 1 : 0;
-      const jewelDetails = hasJewel ? (jewelDescInput.value.trim() || 'Full Bridal Set') : '';
-      const jewelPrice = hasJewel ? (parseFloat(jewelPriceInput.value) || 0) : 0;
-      const finalId = articleIdInput.value.trim().toUpperCase() || '0001';
-
       if (editingArticle) {
         // --- EDIT EXISTING ARTICLE ---
+        // Fallback rule: if any field remains blank, DO NOT overwrite it — keep existing value!
+        const finalName = custNameInput.value.trim() || editingArticle.customer_name || '';
+        const finalPhone = custPhoneInput.value.trim() || editingArticle.customer_phone || '';
+        const finalAltPhone = (custAltPhoneInput ? custAltPhoneInput.value.trim() : '') || editingArticle.customer_alt_phone || null;
+        const finalAddress = custAddrInput.value.trim() || editingArticle.customer_address || editingArticle.notes || '';
+        const finalPickup = pickupInput.value || editingArticle.pickup_date || '';
+        const finalReturn = returnInput.value || editingArticle.return_date || '';
+        const finalCategory = category || editingArticle.category || 'Bridal';
+        const finalId = (articleIdInput.value.trim().toUpperCase()) || editingArticle.article_id || '0001';
+
+        // Price: if user cleared price or entered 0, fallback to existing article price
+        let finalPrice = p;
+        if (finalPrice <= 0) {
+          finalPrice = parseFloat(editingArticle.price) || 0;
+        }
+
+        // Advance: if advance input is empty, fallback to existing article advance
+        let finalAdv = adv;
+        if (advanceInput && advanceInput.value.trim() === '') {
+          finalAdv = (editingArticle.advance_amount !== undefined && editingArticle.advance_amount !== null)
+            ? parseFloat(editingArticle.advance_amount) || 0
+            : 0;
+        }
+        const finalBal = Math.max(0, finalPrice - finalAdv);
+
+        const hasJewel = jewelToggle.checked ? 1 : 0;
+        const jewelDetails = hasJewel
+          ? (jewelDescInput.value.trim() || editingArticle.jewellery_details || 'Full Bridal Set')
+          : '';
+        const jewelPrice = hasJewel
+          ? (parseFloat(jewelPriceInput.value) || editingArticle.jewellery_price || 0)
+          : 0;
+
         overlayController.showProgress(
           'Updating Article...',
-          `Saving changes for ${editingArticle.article_id} & syncing with laptop...`
+          `Saving changes for #${editingArticle.article_id} & syncing with laptop...`
         );
 
         const updatePayload = {
           article_id: finalId,
-          title: category || 'Bridal',
-          category: category,
-          price: p,
-          advance_amount: adv,
-          balance_amount: bal,
+          title: finalCategory,
+          category: finalCategory,
+          price: finalPrice,
+          advance_amount: finalAdv,
+          balance_amount: finalBal,
           has_jewellery: hasJewel,
           jewellery_details: jewelDetails,
           jewellery_price: jewelPrice,
-          customer_name: name,
-          customer_phone: custPhoneInput.value.trim(),
-          customer_alt_phone: custAltPhoneInput ? custAltPhoneInput.value.trim() : (editingArticle.customer_alt_phone || null),
-          customer_address: custAddrInput.value.trim(),
-          pickup_date: pickupInput.value,
-          return_date: returnInput.value,
+          customer_name: finalName,
+          customer_phone: finalPhone,
+          customer_alt_phone: finalAltPhone,
+          customer_address: finalAddress,
+          pickup_date: finalPickup,
+          return_date: finalReturn,
           booking_date: editingArticle.booking_date || getISODate(0),
           salesman_name: editingArticle.salesman_name || 'Studio',
           status: editingArticle.status || 'booked',
@@ -926,7 +955,7 @@ export function createMobileBookingView(containerEl, state) {
           if (photoBlob) {
             overlayController.showProgress(
               'Uploading Photo...',
-              `Uploading new garment photo for ${finalId}...`
+              `Uploading new garment photo for #${finalId}...`
             );
             const photoRes = await api.uploadArticlePhoto(editingArticle.id, photoBlob);
             if (photoRes && photoRes.article) {
@@ -938,7 +967,7 @@ export function createMobileBookingView(containerEl, state) {
             state.onBookingUpdated(updatedArticle);
           }
 
-          showToast(`Article ${updatedArticle.article_id} updated successfully!`, 'success');
+          showToast(`Article #${updatedArticle.article_id} updated successfully!`, 'success');
           overlayController.showSuccess(updatedArticle, () => {
             exitEditMode();
           });
@@ -948,6 +977,8 @@ export function createMobileBookingView(containerEl, state) {
         }
       } else {
         // --- CREATE NEW BOOKING ---
+        if (!hasPhoto || p <= 0 || !name) return;
+        if (!photoBlob) return;
         if (!photoBlob) return;
 
         overlayController.showProgress(

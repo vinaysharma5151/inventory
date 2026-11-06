@@ -364,26 +364,46 @@ async def update_article(
     if not fields:
         return {"success": True, "article": existing}
 
+    # Non-destructive update rule: If any field remains blank or empty, do NOT overwrite it — keep existing value
+    for f in list(fields):
+        val = updates[f]
+        if isinstance(val, str) and not val.strip():
+            # If incoming value is an empty or whitespace string:
+            # If the database already has a value, keep existing value; otherwise omit from update
+            if existing.get(f) is not None and str(existing.get(f)).strip() != "":
+                updates[f] = existing[f]
+            else:
+                fields.remove(f)
+                updates.pop(f, None)
+        elif f == "price":
+            # If price <= 0 and existing has a valid positive price, keep existing price
+            if (val is None or float(val) <= 0) and float(existing.get("price") or 0) > 0:
+                updates[f] = existing["price"]
+        elif f == "advance_amount":
+            # If advance_amount is None, keep existing advance
+            if val is None and existing.get("advance_amount") is not None:
+                updates[f] = existing["advance_amount"]
+
     db = get_db()
 
     # If article_id is being changed, ensure it's not empty and not in use by another article
     if "article_id" in updates:
         new_aid = str(updates["article_id"]).strip()
         if not new_aid:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Article code cannot be empty.",
-            )
-        collision = db.execute(
-            "SELECT id FROM articles WHERE article_id = ? AND id != ?",
-            (new_aid, article_id),
-        ).fetchone()
-        if collision:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Article code '{new_aid}' is already in use by another piece.",
-            )
-        updates["article_id"] = new_aid
+            # Fallback to existing article_id instead of failing
+            new_aid = existing.get("article_id")
+            updates["article_id"] = new_aid
+        elif new_aid != existing.get("article_id"):
+            collision = db.execute(
+                "SELECT id FROM articles WHERE article_id = ? AND id != ?",
+                (new_aid, article_id),
+            ).fetchone()
+            if collision:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Article code '{new_aid}' is already in use by another piece.",
+                )
+            updates["article_id"] = new_aid
 
     # Ensure Garment Title contains Collection Category and not customer name
     if "title" in updates:

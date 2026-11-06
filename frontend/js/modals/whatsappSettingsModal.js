@@ -2,8 +2,9 @@
  * whatsappSettingsModal.js — OpenWA Gateway Configuration Modal.
  * 
  * WHY:
- * Configures the self-hosted OpenWA Gateway (rmyndharis/OpenWA API) for direct 1-click
- * automated WhatsApp message dispatch. Replaces Meta Cloud API setup and wa.me links.
+ * Configures the WhatsApp Session ID for the self-hosted OpenWA Gateway.
+ * Server URL and API Key are maintained statically in the backend and hidden from the UI.
+ * Zero manual wa.me links, zero cloud API fees.
  */
 
 import { openModal, closeModal } from '../modal.js';
@@ -29,7 +30,7 @@ export async function openWhatsAppSettingsModal(onSaved) {
   modalEl.className = 'modal-backdrop';
 
   modalEl.innerHTML = `
-    <div class="modal-dialog" style="max-width: 520px;">
+    <div class="modal-dialog" style="max-width: 500px;">
       <!-- Header -->
       <div class="modal-header" style="background: linear-gradient(135deg, #075E54 0%, #128C7E 100%); color: #FFFFFF; border-bottom: none; border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0; padding: 18px 24px;">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -38,10 +39,10 @@ export async function openWhatsAppSettingsModal(onSaved) {
           </div>
           <div>
             <h3 style="margin: 0; font-size: 1.12rem; font-weight: 700; color: #FFFFFF;">
-              OpenWA WhatsApp Gateway
+              WhatsApp Gateway Settings
             </h3>
             <p style="margin: 2px 0 0; font-size: 0.8rem; color: rgba(255, 255, 255, 0.85);">
-              Self-Hosted 1-Click Automated Messaging
+              Direct 1-Click Automated Messaging
             </p>
           </div>
         </div>
@@ -72,67 +73,27 @@ export async function openWhatsAppSettingsModal(onSaved) {
           </div>
         </div>
 
-        <!-- Server URL -->
-        <div>
-          <label class="input-label" for="wa-server-url" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-            OpenWA Server URL <span style="color: #DC2626;">*</span>
-          </label>
-          <input
-            type="url"
-            id="wa-server-url"
-            class="form-input"
-            placeholder="https://whatsapp.ajjidihatti.com"
-            value="https://whatsapp.ajjidihatti.com"
-            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
-          />
-          <span style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
-            Base address of your OpenWA server instance.
-          </span>
-        </div>
-
-        <!-- API Key -->
-        <div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <label class="input-label" for="wa-api-key" style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin: 0;">
-              OpenWA API Key <span style="color: #DC2626;">*</span>
-            </label>
-            <button type="button" id="btn-toggle-key" class="btn btn-ghost btn-sm" style="font-size: 0.74rem; padding: 2px 6px;">
-              Show / Hide
-            </button>
-          </div>
-          <input
-            type="password"
-            id="wa-api-key"
-            class="form-input"
-            placeholder="owa_k1_..."
-            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.92rem;"
-          />
-          <span id="wa-key-status-hint" style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
-            API key required for X-API-Key authentication.
-          </span>
-        </div>
-
-        <!-- Optional Session ID -->
+        <!-- Session ID Input -->
         <div>
           <label class="input-label" for="wa-session-id" style="display: block; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted, #6B7280); margin-bottom: 4px;">
-            Target Session ID (Optional)
+            WhatsApp Session ID <span style="color: #DC2626;">*</span>
           </label>
           <input
             type="text"
             id="wa-session-id"
             class="form-input"
-            placeholder="Leave empty to auto-detect ready session"
-            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.86rem;"
+            placeholder="e.g. 7e85e48b-fa30-4e8d-afc8-aa5d7b523664 or lengha-booking"
+            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 0.9rem;"
           />
           <span style="font-size: 0.75rem; color: var(--text-muted, #6B7280); margin-top: 3px; display: block;">
-            Auto-detects the connected ready session when left empty.
+            Enter your OpenWA session ID or session name to link this system.
           </span>
         </div>
 
         <!-- Test Message Section -->
         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px;">
           <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 6px;">
-            Test OpenWA Message Dispatch
+            Test WhatsApp Message Dispatch
           </label>
           <div style="display: flex; gap: 8px;">
             <div style="position: relative; flex: 1;">
@@ -160,7 +121,7 @@ export async function openWhatsAppSettingsModal(onSaved) {
             Cancel
           </button>
           <button type="button" id="btn-wa-settings-save" class="btn btn-whatsapp" style="padding: 9px 20px;">
-            ${renderIcon('check', { size: 16, color: '#FFFFFF' })} Save Settings
+            ${renderIcon('check', { size: 16, color: '#FFFFFF' })} Save Session ID
           </button>
         </div>
 
@@ -168,11 +129,7 @@ export async function openWhatsAppSettingsModal(onSaved) {
     </div>
   `;
 
-  const serverUrlInput = modalEl.querySelector('#wa-server-url');
-  const apiKeyInput = modalEl.querySelector('#wa-api-key');
   const sessionIdInput = modalEl.querySelector('#wa-session-id');
-  const keyHint = modalEl.querySelector('#wa-key-status-hint');
-  const btnToggleKey = modalEl.querySelector('#btn-toggle-key');
   const statusBox = modalEl.querySelector('#wa-status-box');
   const statusDot = modalEl.querySelector('#wa-status-dot');
   const statusTitle = modalEl.querySelector('#wa-status-title');
@@ -188,13 +145,6 @@ export async function openWhatsAppSettingsModal(onSaved) {
   const btnCancel = modalEl.querySelector('#btn-wa-settings-cancel');
   const closeBtnTop = modalEl.querySelector('.modal-close-btn');
 
-  // Toggle API key visibility
-  let isKeyVisible = false;
-  btnToggleKey.addEventListener('click', () => {
-    isKeyVisible = !isKeyVisible;
-    apiKeyInput.type = isKeyVisible ? 'text' : 'password';
-  });
-
   // Render Status
   function renderStatus(status) {
     if (status && status.is_ready) {
@@ -203,26 +153,27 @@ export async function openWhatsAppSettingsModal(onSaved) {
       statusDot.style.background = '#22C55E';
       statusDot.style.boxShadow = '0 0 6px #22C55E';
       statusTitle.style.color = '#15803D';
-      statusTitle.textContent = '● OpenWA Connected & Ready';
-    } else if (status && status.has_api_key) {
+      statusTitle.textContent = '● WhatsApp Connected & Ready';
+    } else if (status && status.session_id) {
       statusBox.style.background = '#FFFBEB';
       statusBox.style.borderColor = '#FDE68A';
       statusDot.style.background = '#F59E0B';
       statusDot.style.boxShadow = '0 0 6px #F59E0B';
       statusTitle.style.color = '#B45309';
-      statusTitle.textContent = `● Gateway Reachable (${status.session_status || 'Session Connecting'})`;
+      const detail = status.session_status === 'not_found' ? 'Session Not Found' : (status.session_status || 'Connecting');
+      statusTitle.textContent = `● Gateway Reachable (${detail})`;
     } else {
       statusBox.style.background = '#FEF2F2';
       statusBox.style.borderColor = '#FECACA';
       statusDot.style.background = '#EF4444';
       statusDot.style.boxShadow = '0 0 6px #EF4444';
       statusTitle.style.color = '#B91C1C';
-      statusTitle.textContent = '● OpenWA Disconnected';
+      statusTitle.textContent = '● Session ID Not Configured';
     }
 
     statusPhone.textContent = status?.connected_phone ? `+${status.connected_phone}` : 'Not connected';
-    statusAccount.textContent = status?.push_name || 'N/A';
-    statusSession.textContent = status?.session_name || status?.session_id || 'Auto-detect';
+    statusAccount.textContent = status?.push_name || '—';
+    statusSession.textContent = status?.session_name || status?.session_id || 'Not configured';
     statusText.textContent = (status?.session_status || 'offline').toUpperCase();
   }
 
@@ -231,10 +182,6 @@ export async function openWhatsAppSettingsModal(onSaved) {
     try {
       const status = await api.getWhatsAppStatus();
       if (status && status.success) {
-        if (status.server_url) serverUrlInput.value = status.server_url;
-        if (status.masked_key) {
-          keyHint.innerHTML = `Current Key: <strong style="color: #059669;">${escapeHtml(status.masked_key)}</strong> (Enter new key to replace)`;
-        }
         if (status.session_id) {
           sessionIdInput.value = status.session_id;
         }
@@ -244,18 +191,18 @@ export async function openWhatsAppSettingsModal(onSaved) {
         renderStatus(status);
       }
     } catch (e) {
-      console.warn('Failed to load OpenWA status:', e);
-      renderStatus({ is_ready: false, has_api_key: false });
+      console.warn('Failed to load WhatsApp status:', e);
+      renderStatus({ is_ready: false, session_id: null });
     }
   }
 
   btnRefreshStatus.addEventListener('click', async () => {
     btnRefreshStatus.disabled = true;
-    statusTitle.textContent = 'Probing OpenWA session...';
+    statusTitle.textContent = 'Probing WhatsApp session...';
     try {
       const status = await api.getWhatsAppStatus();
       renderStatus(status);
-      showToast('OpenWA status refreshed', 'neutral');
+      showToast('WhatsApp status refreshed', 'neutral');
     } catch (_) {
       renderStatus({ is_ready: false });
     } finally {
@@ -272,22 +219,22 @@ export async function openWhatsAppSettingsModal(onSaved) {
       return;
     }
 
+    const sId = sessionIdInput.value.trim();
+    if (!sId) {
+      sessionIdInput.focus();
+      showToast('Please enter your WhatsApp Session ID first.', 'warning');
+      return;
+    }
+
     btnTest.disabled = true;
     btnTest.innerHTML = `${renderIcon('refreshCw', { size: 14 })} Sending...`;
     testResultBox.style.display = 'none';
 
     try {
-      // If user typed a new key or URL, save first so test uses current form values
-      const sUrl = serverUrlInput.value.trim();
-      const aKey = apiKeyInput.value.trim();
-      const sId = sessionIdInput.value.trim();
-      if (sUrl && aKey) {
-        await api.saveWhatsAppSettings({
-          server_url: sUrl,
-          api_key: aKey,
-          session_id: sId || null,
-        });
-      }
+      // Auto-save the entered session ID before sending test ping
+      await api.saveWhatsAppSettings({
+        session_id: sId,
+      });
 
       const res = await api.testWhatsAppApi(testNum);
       testResultBox.style.display = 'block';
@@ -296,15 +243,19 @@ export async function openWhatsAppSettingsModal(onSaved) {
         testResultBox.style.background = '#ECFDF5';
         testResultBox.style.color = '#065F46';
         testResultBox.style.border = '1px solid #A7F3D0';
-        testResultBox.innerHTML = `<strong>✅ Success!</strong> ${escapeHtml(res.message || 'Test message delivered successfully via OpenWA.')}`;
+        testResultBox.innerHTML = `<strong>✅ Success!</strong> ${escapeHtml(res.message || 'Test message delivered successfully via WhatsApp.')}`;
         showToast('Test WhatsApp message delivered!', 'success');
       } else {
         testResultBox.style.background = '#FEF2F2';
         testResultBox.style.color = '#991B1B';
         testResultBox.style.border = '1px solid #FECACA';
-        testResultBox.innerHTML = `<strong>⚠️ OpenWA Error:</strong> ${escapeHtml(res.error || 'Failed to dispatch test message. Verify server URL and API key.')}`;
-        showToast('OpenWA test failed. Check details in modal.', 'warning');
+        testResultBox.innerHTML = `<strong>⚠️ WhatsApp Error:</strong> ${escapeHtml(res.error || 'Failed to dispatch test message. Please verify your Session ID.')}`;
+        showToast('WhatsApp test failed. Check details in modal.', 'warning');
       }
+
+      // Refresh status after test
+      const updatedStatus = await api.getWhatsAppStatus();
+      renderStatus(updatedStatus);
     } catch (err) {
       testResultBox.style.display = 'block';
       testResultBox.style.background = '#FEF2F2';
@@ -319,13 +270,11 @@ export async function openWhatsAppSettingsModal(onSaved) {
 
   // Save Settings
   btnSave.addEventListener('click', async () => {
-    const sUrl = serverUrlInput.value.trim();
-    const aKey = apiKeyInput.value.trim();
     const sId = sessionIdInput.value.trim();
 
-    if (!sUrl) {
-      serverUrlInput.focus();
-      showToast('Please enter your OpenWA Server URL.', 'warning');
+    if (!sId) {
+      sessionIdInput.focus();
+      showToast('Please enter your WhatsApp Session ID.', 'warning');
       return;
     }
 
@@ -334,23 +283,21 @@ export async function openWhatsAppSettingsModal(onSaved) {
 
     try {
       const res = await api.saveWhatsAppSettings({
-        server_url: sUrl,
-        api_key: aKey,
-        session_id: sId || null,
+        session_id: sId,
       });
 
       if (res && res.success) {
-        showToast('OpenWA Gateway settings saved!', 'success');
+        showToast('WhatsApp Session ID saved successfully!', 'success');
         closeModal();
         if (onSaved) onSaved(res.config);
       } else {
-        showToast(res.detail || res.error || 'Failed to save settings', 'warning');
+        showToast(res.detail || res.error || 'Failed to save session ID', 'warning');
       }
     } catch (e) {
-      showToast(e.message || 'Failed to save settings', 'warning');
+      showToast(e.message || 'Failed to save session ID', 'warning');
     } finally {
       btnSave.disabled = false;
-      btnSave.innerHTML = `${renderIcon('check', { size: 16, color: '#FFFFFF' })} Save Settings`;
+      btnSave.innerHTML = `${renderIcon('check', { size: 16, color: '#FFFFFF' })} Save Session ID`;
     }
   });
 

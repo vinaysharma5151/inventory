@@ -7,7 +7,7 @@ import { API_BASE, request } from './client.js';
 export const whatsappApi = {
   /**
    * Checks overall WhatsApp configuration (OpenWA connection & active session status).
-   * @returns {Promise<{success: boolean, mode: string, gateway: string, server_url: string, has_api_key: boolean, masked_key: string, session_id: string, session_name: string, session_status: string, connected_phone: string, push_name: string, is_ready: boolean, shop_name: string}>}
+   * @returns {Promise<{success: boolean, mode: string, gateway: string, session_id: string, session_name: string, session_status: string, connected_phone: string, push_name: string, is_ready: boolean, shop_name: string}>}
    */
   async getWhatsAppStatus() {
     try {
@@ -19,8 +19,8 @@ export const whatsappApi = {
   },
 
   /**
-   * Saves OpenWA Gateway credentials.
-   * @param {{server_url: string, api_key: string, session_id?: string}} payload
+   * Saves OpenWA Gateway session ID.
+   * @param {{session_id: string}} payload
    */
   async saveWhatsAppSettings(payload) {
     const res = await request(`${API_BASE}/whatsapp/settings`, {

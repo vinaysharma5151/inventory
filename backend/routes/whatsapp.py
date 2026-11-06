@@ -38,9 +38,9 @@ class WhatsAppSendArticlePayload(BaseModel):
 
 
 class OpenWASettingsPayload(BaseModel):
-    server_url: str = Field(..., min_length=1)
-    api_key: str = Field(..., min_length=1)
-    session_id: Optional[str] = None
+    session_id: str = Field(..., min_length=1)
+    server_url: Optional[str] = None
+    api_key: Optional[str] = None
 
 
 class WhatsAppTestPayload(BaseModel):
@@ -57,9 +57,6 @@ def whatsapp_status(current_user: dict = Depends(require_staff_or_owner)):
         "enabled": cfg.get("enabled", True),
         "mode": "openwa",
         "gateway": cfg.get("gateway"),
-        "server_url": cfg.get("server_url"),
-        "has_api_key": cfg.get("has_api_key", False),
-        "masked_key": cfg.get("masked_key", ""),
         "session_id": cfg.get("session_id"),
         "session_name": cfg.get("session_name"),
         "session_status": cfg.get("session_status"),
@@ -75,19 +72,17 @@ def update_whatsapp_settings(
     payload: OpenWASettingsPayload,
     current_user: dict = Depends(require_owner),
 ):
-    """Save OpenWA Server credentials (restricted to showroom Owner)."""
+    """Save OpenWA Session ID (restricted to showroom Owner)."""
     saved = save_openwa_credentials(
-        server_url=payload.server_url,
-        api_key=payload.api_key,
         session_id=payload.session_id,
     )
     if not saved:
-        raise HTTPException(status_code=500, detail="Failed to persist OpenWA settings.")
+        raise HTTPException(status_code=500, detail="Failed to persist WhatsApp session ID.")
 
     cfg = get_whatsapp_config()
     return {
         "success": True,
-        "message": "OpenWA settings saved successfully.",
+        "message": "WhatsApp session ID saved successfully.",
         "config": cfg,
     }
 
@@ -99,10 +94,10 @@ def test_openwa_whatsapp(
 ):
     """Sends a test ping message via OpenWA to verify live connection."""
     cfg = get_whatsapp_config()
-    if not cfg.get("has_api_key") or not cfg.get("server_url"):
+    if not cfg.get("session_id"):
         raise HTTPException(
             status_code=400,
-            detail="OpenWA gateway credentials not configured. Please enter Server URL and API Key in settings.",
+            detail="WhatsApp Session ID is not configured. Please enter your Session ID in settings.",
         )
 
     shop_title = get_shop_name()

@@ -31,9 +31,12 @@ logger.setLevel(logging.INFO)
 # User-Agent header (prevents reverse-proxies / WAFs from blocking python-urllib)
 HTTP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
-# Default pre-configured OpenWA credentials
-DEFAULT_OPENWA_SERVER_URL = "https://whatsapp.ajjidihatti.com"
-DEFAULT_OPENWA_API_KEY = "owa_k1_34994de68ea8f5cefb0a24b24ffbdc16ffdd2ee3979283b68b794e3ed6f43259"
+# Static OpenWA Gateway credentials (hardcoded, internal only)
+STATIC_OPENWA_SERVER_URL = "https://whatsapp.ajjidihatti.com"
+STATIC_OPENWA_API_KEY = "owa_k1_34994de68ea8f5cefb0a24b24ffbdc16ffdd2ee3979283b68b794e3ed6f43259"
+
+DEFAULT_OPENWA_SERVER_URL = STATIC_OPENWA_SERVER_URL
+DEFAULT_OPENWA_API_KEY = STATIC_OPENWA_API_KEY
 
 
 def format_phone_number(phone_raw: Optional[str]) -> Optional[str]:
@@ -74,51 +77,41 @@ def get_shop_name() -> str:
 
 def get_openwa_credentials() -> Dict[str, str]:
     """
-    Retrieve OpenWA Server URL, API Key, and optional selected Session ID from SQLite settings,
-    falling back to verified default credentials.
+    Retrieve OpenWA credentials. Server URL and API Key are strictly static constants,
+    while Session ID is loaded from SQLite settings.
     """
     try:
         db = get_db()
         db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-        rows = db.execute("SELECT key, value FROM settings WHERE key LIKE 'openwa_%'").fetchall()
-        settings_map = {row["key"]: row["value"] for row in rows}
-
-        server_url = (settings_map.get("openwa_server_url") or "").strip().rstrip("/")
-        if not server_url:
-            server_url = DEFAULT_OPENWA_SERVER_URL
-
-        api_key = (settings_map.get("openwa_api_key") or "").strip()
-        if not api_key:
-            api_key = DEFAULT_OPENWA_API_KEY
-
-        session_id = (settings_map.get("openwa_session_id") or "").strip()
+        row = db.execute("SELECT value FROM settings WHERE key = 'openwa_session_id'").fetchone()
+        session_id = (row["value"] if row and row["value"] else "").strip()
 
         return {
-            "server_url": server_url,
-            "api_key": api_key,
+            "server_url": STATIC_OPENWA_SERVER_URL,
+            "api_key": STATIC_OPENWA_API_KEY,
             "session_id": session_id,
         }
     except Exception as e:
         logger.error(f"[WHATSAPP] Failed to load OpenWA settings: {e}")
         return {
-            "server_url": DEFAULT_OPENWA_SERVER_URL,
-            "api_key": DEFAULT_OPENWA_API_KEY,
+            "server_url": STATIC_OPENWA_SERVER_URL,
+            "api_key": STATIC_OPENWA_API_KEY,
             "session_id": "",
         }
 
 
 def save_openwa_credentials(
-    server_url: str,
-    api_key: str,
     session_id: Optional[str] = None,
+    server_url: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> bool:
-    """Save OpenWA Server credentials in SQLite settings."""
+    """Save OpenWA Session ID in SQLite settings (server_url and api_key remain strictly static)."""
     try:
         db = get_db()
         db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
         pairs = [
-            ("openwa_server_url", (server_url or "").strip().rstrip("/")),
-            ("openwa_api_key", (api_key or "").strip()),
+            ("openwa_server_url", STATIC_OPENWA_SERVER_URL),
+            ("openwa_api_key", STATIC_OPENWA_API_KEY),
             ("openwa_session_id", (session_id or "").strip()),
         ]
         for k, v in pairs:
@@ -138,12 +131,8 @@ def get_openwa_sessions(
     Queries OpenWA GET /api/sessions to list active WhatsApp instances.
     Returns (success, sessions_list, message).
     """
-    creds = get_openwa_credentials()
-    target_url = (server_url or creds["server_url"]).rstrip("/")
-    target_key = api_key or creds["api_key"]
-
-    if not target_url or not target_key:
-        return False, [], "OpenWA Server URL or API Key is missing."
+    target_url = STATIC_OPENWA_SERVER_URL.rstrip("/")
+    target_key = STATIC_OPENWA_API_KEY
 
     url = f"{target_url}/api/sessions"
     req = urllib.request.Request(
@@ -183,57 +172,59 @@ def get_openwa_active_session(
     session_id_override: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Finds the active/ready WhatsApp session.
-    Prioritizes a session with status == 'ready'.
+    Finds the specific WhatsApp session matching configured session_id.
+    Strictly requires an explicit session_id — NEVER auto-detects or falls back to other sessions.
     """
     creds = get_openwa_credentials()
-    target_sid = session_id_override or creds.get("session_id")
+    if session_id_override is not None:
+        target_sid = session_id_override.strip()
+    else:
+        target_sid = (creds.get("session_id") or "").strip()
+
+    # DO NOT auto-detect: if no session_id is configured, return None
+    if not target_sid:
+        return None
 
     ok, sessions, _ = get_openwa_sessions(server_url, api_key)
     if not ok or not sessions:
         return None
 
-    # If specific session configured, check if it exists
-    if target_sid:
-        for s in sessions:
-            if s.get("id") == target_sid:
-                return s
-
-    # Otherwise auto-pick the first 'ready' session
+    # Strictly find the session matching target_sid by id or name
     for s in sessions:
-        if s.get("status") == "ready":
+        s_id = str(s.get("id") or "").strip()
+        s_name = str(s.get("name") or "").strip()
+        if s_id.lower() == target_sid.lower() or s_name.lower() == target_sid.lower():
             return s
 
-    # Fallback to first session if none marked ready
-    return sessions[0] if sessions else None
+    # Strictly return None if target_sid does not match any session (NO auto-detect / fallback)
+    return None
 
 
 def get_whatsapp_config() -> Dict[str, Any]:
     """
-    Returns full OpenWA gateway configuration and live connection status.
-    Used by dashboard indicators, modals, and settings screens.
+    Returns WhatsApp gateway configuration and live connection status.
+    Note: server_url and api_key are kept internal/static.
     """
     creds = get_openwa_credentials()
-    server_url = creds["server_url"]
-    api_key = creds["api_key"]
+    configured_sid = creds.get("session_id", "").strip()
     session = get_openwa_active_session()
 
-    masked_key = ""
-    if api_key:
-        masked_key = f"{api_key[:8]}...{api_key[-6:]}" if len(api_key) > 16 else "Configured"
-
     is_ready = bool(session and session.get("status") == "ready")
+
+    if session:
+        session_status = session.get("status", "unknown")
+    elif configured_sid:
+        session_status = "not_found"
+    else:
+        session_status = "not_configured"
 
     return {
         "enabled": True,
         "mode": "openwa",
         "gateway": "OpenWA Self-Hosted API",
-        "server_url": server_url,
-        "has_api_key": bool(api_key),
-        "masked_key": masked_key,
-        "session_id": session.get("id") if session else None,
+        "session_id": configured_sid or (session.get("id") if session else None),
         "session_name": session.get("name") if session else None,
-        "session_status": session.get("status") if session else "disconnected",
+        "session_status": session_status,
         "connected_phone": session.get("phone") if session else None,
         "push_name": session.get("pushName") if session else None,
         "is_ready": is_ready,
@@ -258,18 +249,21 @@ def send_openwa_message(
         return False, "Invalid recipient phone number (must be at least 10 digits).", None
 
     creds = get_openwa_credentials()
-    server_url = creds["server_url"].rstrip("/")
-    api_key = creds["api_key"]
+    configured_sid = creds.get("session_id", "").strip()
+    if not configured_sid:
+        return False, "WhatsApp Session ID is not configured. Please enter your Session ID in WhatsApp Settings.", None
 
     session = get_openwa_active_session()
     if not session:
-        return False, "No active WhatsApp session found on OpenWA server. Please verify gateway settings.", None
+        return False, f"WhatsApp session '{configured_sid}' not found or unreachable on OpenWA server. Please verify the Session ID in settings.", None
 
     if session.get("status") != "ready":
-        return False, f"OpenWA session '{session.get('name', 'default')}' is not ready (current status: {session.get('status')}).", session
+        return False, f"WhatsApp session '{session.get('name') or configured_sid}' is not ready (current status: {session.get('status')}).", session
 
     session_id = session["id"]
     chat_id = f"{clean_phone}@c.us"
+    server_url = STATIC_OPENWA_SERVER_URL.rstrip("/")
+    api_key = STATIC_OPENWA_API_KEY
 
     headers = {
         "X-API-Key": api_key,
@@ -467,7 +461,6 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
         f"• No alterations after booking.\n"
         f"• Please return on or before {return_date}. Late returns will be charged ₹300/day.\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📞 *Contact:* 9541004204\n"
         f"🙏 *Thank you!* See you on pickup day."
     )
     return text
@@ -506,7 +499,6 @@ def generate_pickup_reminder_text(article: Dict[str, Any], shop_name: Optional[s
         f"📅 *Pickup Date:* {pickup_date}\n"
         f"{balance_line}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📞 *Contact:* 9541004204\n"
         f"🙏 *Thank you!* We look forward to seeing you tomorrow."
     )
     return text
@@ -533,7 +525,6 @@ def generate_return_reminder_text(article: Dict[str, Any], shop_name: Optional[s
         f"📌 *Please Note:*\n"
         f"Kindly return on or before tomorrow to avoid late charges of *₹300/day*.\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📞 *Contact:* 9541004204\n"
         f"🙏 *Thank you for choosing us!*"
     )
     return text
