@@ -29,10 +29,10 @@ function escapeHtml(str) {
 /**
  * Opens the article detail modal.
  * @param {object} article - Full article object
- * @param {string} [shopName='Bridal Studio'] - Boutique name
+ * @param {string} [shopName='Bhavi'] - Boutique name
  * @param {object} [callbacks] - { onUpdate, onDelete }
  */
-export function openArticleDetailModal(article, shopName = 'Bridal Studio', { onUpdate, onDelete, currentUser } = {}) {
+export function openArticleDetailModal(article, shopName = 'Bhavi', { onUpdate, onDelete, currentUser } = {}) {
   if (!article) return;
 
   const numPrice = Number(article.price) || 0;

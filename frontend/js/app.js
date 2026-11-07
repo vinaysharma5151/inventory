@@ -11,17 +11,18 @@
 
 import { api } from './api.js?v=12';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js?v=16';
-import { createMobileBookingView } from './views/mobileBookingView.js?v=20';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=17';
+import { createMobileBookingView } from './views/mobileBookingView.js?v=21';
 import { openLoginModal } from './modals/loginModal.js';
 
 class App {
   constructor() {
     this.rootEl = document.getElementById('app-root');
     this.articles = [];
-    this.shopName = localStorage.getItem('app_shop_name') || '';
+    this.shopName = localStorage.getItem('app_shop_name') || 'Bhavi';
     this.shopTagline = localStorage.getItem('app_shop_tagline') || 'LUXURY BRIDAL ATELIER & STUDIO INVENTORY';
-    this.logoUrl = localStorage.getItem('app_logo_url') || '/assets/logo.png';
+    const rawLogo = localStorage.getItem('app_logo_url');
+    this.logoUrl = (rawLogo && !rawLogo.includes('/uploads/shop_logo.png')) ? rawLogo : '/assets/logo.png';
     this.currentUser = null;
     this.activeViewController = null;
     this.viewMode = this.detectViewMode();
@@ -181,7 +182,11 @@ class App {
   async loadSettings() {
     const storedName = localStorage.getItem('app_shop_name');
     const storedTagline = localStorage.getItem('app_shop_tagline');
-    const storedLogo = localStorage.getItem('app_logo_url');
+    let storedLogo = localStorage.getItem('app_logo_url');
+    if (storedLogo && storedLogo.includes('/uploads/shop_logo.png')) {
+      storedLogo = '/assets/logo.png';
+      localStorage.setItem('app_logo_url', '/assets/logo.png');
+    }
     if (storedName) this.shopName = storedName;
     if (storedTagline) this.shopTagline = storedTagline;
     if (storedLogo) this.logoUrl = storedLogo;

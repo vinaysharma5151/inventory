@@ -31,7 +31,7 @@ const getISODate = (offsetDays = 0) => {
 };
 
 export function createMobileBookingView(containerEl, state) {
-  let shopName = state.shopName || 'Bridal Studio';
+  let shopName = state.shopName || localStorage.getItem('app_shop_name') || 'Bhavi';
   let logoUrl = state.logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
   let category = 'Bridal';
   let pickupDate = getISODate(2);
@@ -365,6 +365,11 @@ export function createMobileBookingView(containerEl, state) {
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Mobile Copyright Notice -->
+          <div class="mobile-footer-copyright">
+            © 2026 Bhavi. All rights reserved.
           </div>
         </main>
 

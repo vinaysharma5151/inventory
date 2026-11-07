@@ -63,7 +63,7 @@ def whatsapp_status(current_user: dict = Depends(require_staff_or_owner)):
         "connected_phone": cfg.get("connected_phone"),
         "push_name": cfg.get("push_name"),
         "is_ready": cfg.get("is_ready", False),
-        "shop_name": cfg.get("shop_name", "Bridal Studio"),
+        "shop_name": cfg.get("shop_name", "Bhavi"),
     }
 
 

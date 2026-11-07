@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ===================================================
-echo   Building LehengaBooking.exe (Windows Standalone)
+echo   Building Bhavi.exe (Windows Standalone)
 echo ===================================================
 echo.
 
@@ -35,21 +35,21 @@ if not exist "frontend\index.html" (
 echo [2/3] Verified vanilla web assets in frontend\...
 
 :: 4. Clean previous build caches & compile single-file executable
-echo [3/3] Compiling fresh LehengaBooking.exe with PyInstaller...
+echo [3/3] Compiling fresh Bhavi.exe with PyInstaller...
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
-%PY_CMD% -m PyInstaller --noconfirm --clean LehengaBooking.spec
+%PY_CMD% -m PyInstaller --noconfirm --clean Bhavi.spec
 
-if exist "dist\LehengaBooking.exe" (
-    copy /y "dist\LehengaBooking.exe" "LehengaBooking.exe" >nul
+if exist "dist\Bhavi.exe" (
+    copy /y "dist\Bhavi.exe" "Bhavi.exe" >nul
     echo.
     echo ===================================================
     echo   SUCCESS! Standalone Executable Created:
-    echo   %CD%\LehengaBooking.exe
-    echo   %CD%\dist\LehengaBooking.exe
+    echo   %CD%\Bhavi.exe
+    echo   %CD%\dist\Bhavi.exe
     echo ===================================================
     echo.
-    echo You can run LehengaBooking.exe directly or copy it to any Windows PC!
+    echo You can run Bhavi.exe directly or copy it to any Windows PC!
     echo When you double-click it, it will launch the app and open the browser.
     echo.
     explorer.exe dist

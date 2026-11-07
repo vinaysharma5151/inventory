@@ -258,7 +258,7 @@ def reset_database():
 def print_banner():
     """Display warning header."""
     print("=" * 64)
-    print("        LEHENGA BOOKING — FACTORY RESET UTILITY")
+    print("           BHAVI — FACTORY RESET UTILITY")
     print("=" * 64)
     print("This utility will wipe all existing data and reset the app to")
     print("a brand-new, fresh state for a new client or showroom.")

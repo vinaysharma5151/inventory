@@ -72,7 +72,7 @@ def get_shop_name() -> str:
             return row["value"].strip()
     except Exception as e:
         logger.error(f"[WHATSAPP] Failed to load shop name: {e}")
-    return "Bridal Studio"
+    return "Bhavi"
 
 
 def get_openwa_credentials() -> Dict[str, str]:

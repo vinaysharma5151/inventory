@@ -19,7 +19,7 @@ const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
 
 export function createDesktopDashboard(containerEl, state) {
   let articles = state.articles || [];
-  let shopName = state.shopName || localStorage.getItem('app_shop_name') || 'Bridal Studio';
+  let shopName = state.shopName || localStorage.getItem('app_shop_name') || 'Bhavi';
   let shopTagline = state.shopTagline || localStorage.getItem('app_shop_tagline') || 'LUXURY BRIDAL ATELIER & STUDIO INVENTORY';
   let currentUser = state.currentUser || null;
 
@@ -189,6 +189,11 @@ export function createDesktopDashboard(containerEl, state) {
         <!-- Grid Container -->
         <section id="articles-grid-container" class="articles-cards-grid"></section>
       </main>
+
+      <!-- App Footer -->
+      <footer class="desktop-app-footer">
+        <p class="copyright-text">© 2026 Silent Routing. All rights reserved.</p>
+      </footer>
     </div>
   `;
 

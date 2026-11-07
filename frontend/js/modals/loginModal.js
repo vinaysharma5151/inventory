@@ -66,6 +66,10 @@ export function openLoginModal(onSuccess) {
           Sign In
         </button>
       </div>
+
+      <div style="text-align: center; margin-top: 6px; font-size: 11px; color: var(--color-text-muted); opacity: 0.8; letter-spacing: 0.02em;">
+        © 2026 Silent Routing. All rights reserved.
+      </div>
     </form>
   `;
 

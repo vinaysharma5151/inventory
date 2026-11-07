@@ -193,7 +193,7 @@ def get_public_branding():
     db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
 
     shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bridal Studio"
+    shop_name = shop_row["value"] if shop_row and shop_row["value"] else "Bhavi"
 
     tagline_row = db.execute("SELECT value FROM settings WHERE key = 'shop_tagline'").fetchone()
     shop_tagline = tagline_row["value"] if tagline_row and tagline_row["value"] else "LUXURY BRIDAL ATELIER & STUDIO INVENTORY"
@@ -294,7 +294,7 @@ async def update_branding(
     db.commit()
 
     active_name_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    final_name = active_name_row["value"] if active_name_row else (shop_name or "Bridal Studio")
+    final_name = active_name_row["value"] if active_name_row else (shop_name or "Bhavi")
 
     active_tag_row = db.execute("SELECT value FROM settings WHERE key = 'shop_tagline'").fetchone()
     final_tagline = active_tag_row["value"] if active_tag_row else (shop_tagline or "LUXURY BRIDAL ATELIER & STUDIO INVENTORY")
@@ -357,7 +357,7 @@ async def complete_first_run_setup(request: Request):
     db = get_db()
     db.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
 
-    shop_name = raw_name if raw_name else "My Bridal Studio"
+    shop_name = raw_name if raw_name else "Bhavi"
 
     db.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_name', ?)",

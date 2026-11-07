@@ -1,10 +1,10 @@
 /* ============================================================
-   MEHAK BRIDAL STUDIO — Luxury Bridal Studio Design System
+   BHAVI — Luxury Booking & Inventory Design System
    Modular CSS Entry Point
    ============================================================ */
 
 @import "./base.css?v=8";
 @import "./components.css?v=8";
-@import "./desktop.css?v=15";
-@import "./mobile.css?v=9";
+@import "./desktop.css?v=16";
+@import "./mobile.css?v=10";
 @import "./modals.css?v=9";

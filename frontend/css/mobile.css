@@ -1150,3 +1150,14 @@
   animation: goldPulseHighlight 2s ease-out;
 }
 
+/* Mobile Footer Copyright Notice */
+.mobile-footer-copyright {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted, #8A92A6);
+  padding: 18px 12px 32px;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+

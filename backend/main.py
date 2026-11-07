@@ -105,7 +105,7 @@ async def lifespan(app: FastAPI):
 # FastAPI App
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Bridal Studio — Lehenga Booking API",
+    title="Bhavi — Booking & Inventory API",
     version=APP_VERSION,
     lifespan=lifespan,
     docs_url=None,   # Hardened: disable OpenAPI docs in production

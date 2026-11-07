@@ -32,20 +32,20 @@ jobs:
 
       - name: Build Standalone Executable with PyInstaller
         run: |
-          python -m PyInstaller --noconfirm LehengaBooking.spec
+          python -m PyInstaller --noconfirm Bhavi.spec
 
-      - name: Upload LehengaBooking.exe Artifact
+      - name: Upload Bhavi.exe Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LehengaBooking-Windows-EXE
-          path: dist/LehengaBooking.exe
+          name: Bhavi-Windows-EXE
+          path: dist/Bhavi.exe
           if-no-files-found: error
 
       - name: Release to Main Repository Releases (if Tagged)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/LehengaBooking.exe
+          files: dist/Bhavi.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -53,8 +53,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && env.RELEASE_PAT != ''
         uses: softprops/action-gh-release@v2
         with:
-          repository: vinaysharma5151/rental_releases
-          files: dist/LehengaBooking.exe
+          repository: vinaysharma5151/silent-routing-bhavi
+          files: dist/Bhavi.exe
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}

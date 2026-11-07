@@ -44,7 +44,7 @@ export function openShopNameModal(optionsOrName = '', maybeOnSave) {
     onSave = maybeOnSave;
   }
 
-  const activeName = currentName || localStorage.getItem('app_shop_name') || 'Bridal Studio';
+  const activeName = currentName || localStorage.getItem('app_shop_name') || 'Bhavi';
   const activeTagline = currentTagline || localStorage.getItem('app_shop_tagline') || 'LUXURY BRIDAL ATELIER & STUDIO INVENTORY';
   const activeLogo = currentLogoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
 

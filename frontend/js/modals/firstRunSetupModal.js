@@ -270,6 +270,11 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
           </div>
 
         </div>
+
+        <!-- Wizard Copyright Notice -->
+        <div style="padding:14px 28px 18px; text-align:center; border-top:1px solid rgba(212,160,23,0.12); font-size:11.5px; color:rgba(245,230,200,0.45); letter-spacing:0.02em;">
+          © 2026 Silent Routing. All rights reserved.
+        </div>
       </div>
     </div>
   `;
@@ -316,7 +321,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
     if (n === 3) {
       // Fill confirm panel
       confirmLogo.src = previewUrl || currentLogoUrl;
-      confirmName.textContent = shopNameInput.value.trim() || 'My Bridal Studio';
+      confirmName.textContent = shopNameInput.value.trim() || 'Bhavi';
       setTimeout(() => passwordInput?.focus(), 120);
     }
     if (n === 2) {
@@ -374,7 +379,7 @@ export function renderFirstRunGatekeeper(container, { currentName = '', currentL
 
   // ── Final submit ──
   submitBtn.addEventListener('click', async () => {
-    const shopName = shopNameInput.value.trim() || 'My Bridal Studio';
+    const shopName = shopNameInput.value.trim() || 'Bhavi';
     const password = passwordInput.value.trim();
 
     errorBox.style.display = 'none';

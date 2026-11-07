@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-LehengaBooking.spec — PyInstaller Packaging Specification.
+Bhavi.spec — PyInstaller Packaging Specification for Bhavi.exe.
 
 WHY:
 Bundles the complete FastAPI server, SQLite database drivers, and the vanilla HTML/CSS/JS
-frontend into a standalone, single-file Windows executable (LehengaBooking.exe).
+frontend into a standalone, single-file Windows executable (Bhavi.exe).
 No Node.js, npm, Vite, or external runtimes required.
 """
 
@@ -97,7 +97,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='LehengaBooking',
+    name='Bhavi',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1087,3 +1087,20 @@
   font-weight: 600;
 }
 
+/* App Footer Copyright */
+.desktop-app-footer {
+  text-align: center;
+  padding: 24px 20px 36px;
+  border-top: 1px solid var(--border-subtle, #F0F2F5);
+  margin-top: 16px;
+}
+
+.desktop-app-footer .copyright-text {
+  font-size: 0.78rem;
+  color: var(--text-muted, #6B7280);
+  letter-spacing: 0.03em;
+  margin: 0;
+  font-weight: 500;
+}
+
+

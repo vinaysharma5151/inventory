@@ -28,7 +28,7 @@ function escapeHtml(str) {
  * @param {string} [shopName] - Store brand title
  * @param {object} [options] - Optional callbacks
  */
-export async function openWhatsAppBillModal(article, shopName = 'Bridal Studio', options = {}) {
+export async function openWhatsAppBillModal(article, shopName = 'Bhavi', options = {}) {
   const modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
 

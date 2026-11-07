@@ -2,16 +2,16 @@
 setlocal
 
 :: If standalone exe exists, launch it directly in this window
-if exist "dist\LehengaBooking.exe" (
-    echo Starting Lehenga Booking System (Standalone)...
-    "dist\LehengaBooking.exe"
+if exist "dist\Bhavi.exe" (
+    echo Starting Bhavi System (Standalone)...
+    "dist\Bhavi.exe"
     pause
     exit /b 0
 )
 
-if exist "LehengaBooking.exe" (
-    echo Starting Lehenga Booking System (Standalone)...
-    "LehengaBooking.exe"
+if exist "Bhavi.exe" (
+    echo Starting Bhavi System (Standalone)...
+    "Bhavi.exe"
     pause
     exit /b 0
 )
@@ -36,6 +36,6 @@ if %ERRORLEVEL% neq 0 (
     %PY_CMD% -m pip install -r backend\requirements.txt
 )
 
-echo Starting Lehenga Booking System...
+echo Starting Bhavi System...
 %PY_CMD% desktop_launcher.py
 pause
