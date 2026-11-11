@@ -12,7 +12,7 @@
 import { api } from './api.js?v=12';
 import { playLiveSyncChime, showToast } from './toast.js';
 import { createDesktopDashboard } from './views/desktopDashboard.js?v=17';
-import { createMobileBookingView } from './views/mobileBookingView.js?v=21';
+import { createMobileBookingView } from './views/mobileBookingView.js?v=23';
 import { openLoginModal } from './modals/loginModal.js';
 
 class App {

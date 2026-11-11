@@ -369,7 +369,7 @@ export function createMobileBookingView(containerEl, state) {
 
           <!-- Mobile Copyright Notice -->
           <div class="mobile-footer-copyright">
-            © 2026 Bhavi. All rights reserved.
+            © 2026 Silent Routing. All rights reserved.
           </div>
         </main>
 
@@ -878,156 +878,167 @@ export function createMobileBookingView(containerEl, state) {
 
     // Submit Booking or Update
     submitBtn.addEventListener('click', async () => {
-      const payValues = paymentController.getValues();
-      const p = payValues.price;
-      const adv = payValues.advance;
-      const bal = payValues.balance;
-      const name = custNameInput.value.trim();
-      const photoBlob = cameraController?.getPhotoBlob();
-      const hasPhoto = Boolean(
-        cameraController?.hasPhoto
-          ? cameraController.hasPhoto()
-          : photoBlob
-      );
+      try {
+        const payValues = paymentController.getValues();
+        const p = payValues.price;
+        const adv = payValues.advance;
+        const bal = payValues.balance;
+        const name = custNameInput.value.trim();
+        const photoBlob = cameraController?.getPhotoBlob();
+        const hasPhoto = Boolean(
+          cameraController?.hasPhoto
+            ? cameraController.hasPhoto()
+            : photoBlob
+        );
 
-      if (editingArticle) {
-        // --- EDIT EXISTING ARTICLE ---
-        // Fallback rule: if any field remains blank, DO NOT overwrite it — keep existing value!
-        const finalName = custNameInput.value.trim() || editingArticle.customer_name || '';
-        const finalPhone = custPhoneInput.value.trim() || editingArticle.customer_phone || '';
-        const finalAltPhone = (custAltPhoneInput ? custAltPhoneInput.value.trim() : '') || editingArticle.customer_alt_phone || null;
-        const finalAddress = custAddrInput.value.trim() || editingArticle.customer_address || editingArticle.notes || '';
-        const finalPickup = pickupInput.value || editingArticle.pickup_date || '';
-        const finalReturn = returnInput.value || editingArticle.return_date || '';
-        const finalCategory = category || editingArticle.category || 'Bridal';
-        const finalId = (articleIdInput.value.trim().toUpperCase()) || editingArticle.article_id || '0001';
-
-        // Price: if user cleared price or entered 0, fallback to existing article price
-        let finalPrice = p;
-        if (finalPrice <= 0) {
-          finalPrice = parseFloat(editingArticle.price) || 0;
-        }
-
-        // Advance: if advance input is empty, fallback to existing article advance
-        let finalAdv = adv;
-        if (advanceInput && advanceInput.value.trim() === '') {
-          finalAdv = (editingArticle.advance_amount !== undefined && editingArticle.advance_amount !== null)
-            ? parseFloat(editingArticle.advance_amount) || 0
-            : 0;
-        }
-        const finalBal = Math.max(0, finalPrice - finalAdv);
-
+        const finalId = (articleIdInput.value.trim().toUpperCase()) || (editingArticle ? editingArticle.article_id : '0001');
         const hasJewel = jewelToggle.checked ? 1 : 0;
         const jewelDetails = hasJewel
-          ? (jewelDescInput.value.trim() || editingArticle.jewellery_details || 'Full Bridal Set')
+          ? (jewelDescInput.value.trim() || (editingArticle ? editingArticle.jewellery_details : '') || 'Full Bridal Set')
           : '';
         const jewelPrice = hasJewel
-          ? (parseFloat(jewelPriceInput.value) || editingArticle.jewellery_price || 0)
+          ? (parseFloat(jewelPriceInput.value) || (editingArticle ? editingArticle.jewellery_price : 0) || 0)
           : 0;
 
-        overlayController.showProgress(
-          'Updating Article...',
-          `Saving changes for #${editingArticle.article_id} & syncing with laptop...`
-        );
+        if (editingArticle) {
+          // --- EDIT EXISTING ARTICLE ---
+          // Fallback rule: if any field remains blank, DO NOT overwrite it — keep existing value!
+          const finalName = custNameInput.value.trim() || editingArticle.customer_name || '';
+          const finalPhone = custPhoneInput.value.trim() || editingArticle.customer_phone || '';
+          const finalAltPhone = (custAltPhoneInput ? custAltPhoneInput.value.trim() : '') || editingArticle.customer_alt_phone || null;
+          const finalAddress = custAddrInput.value.trim() || editingArticle.customer_address || editingArticle.notes || '';
+          const finalPickup = pickupInput.value || editingArticle.pickup_date || '';
+          const finalReturn = returnInput.value || editingArticle.return_date || '';
+          const finalCategory = category || editingArticle.category || 'Bridal';
 
-        const updatePayload = {
-          article_id: finalId,
-          title: finalCategory,
-          category: finalCategory,
-          price: finalPrice,
-          advance_amount: finalAdv,
-          balance_amount: finalBal,
-          has_jewellery: hasJewel,
-          jewellery_details: jewelDetails,
-          jewellery_price: jewelPrice,
-          customer_name: finalName,
-          customer_phone: finalPhone,
-          customer_alt_phone: finalAltPhone,
-          customer_address: finalAddress,
-          pickup_date: finalPickup,
-          return_date: finalReturn,
-          booking_date: editingArticle.booking_date || getISODate(0),
-          salesman_name: editingArticle.salesman_name || 'Studio',
-          status: editingArticle.status || 'booked',
-        };
-
-        try {
-          // 1. Update metadata fields
-          const res = await api.updateArticle(editingArticle.id, updatePayload);
-          let updatedArticle = res.article || { ...editingArticle, ...updatePayload };
-
-          // 2. If a replacement photo was snapped or selected from gallery, upload it
-          if (photoBlob) {
-            overlayController.showProgress(
-              'Uploading Photo...',
-              `Uploading new garment photo for #${finalId}...`
-            );
-            const photoRes = await api.uploadArticlePhoto(editingArticle.id, photoBlob);
-            if (photoRes && photoRes.article) {
-              updatedArticle = photoRes.article;
-            }
+          // Price: if user cleared price or entered 0, fallback to existing article price
+          let finalPrice = p;
+          if (finalPrice <= 0) {
+            finalPrice = parseFloat(editingArticle.price) || 0;
           }
 
-          if (state.onBookingUpdated) {
-            state.onBookingUpdated(updatedArticle);
+          // Advance: if advance input is empty, fallback to existing article advance
+          let finalAdv = adv;
+          if (advanceInput && advanceInput.value.trim() === '') {
+            finalAdv = (editingArticle.advance_amount !== undefined && editingArticle.advance_amount !== null)
+              ? parseFloat(editingArticle.advance_amount) || 0
+              : 0;
           }
+          const finalBal = Math.max(0, finalPrice - finalAdv);
 
-          showToast(`Article #${updatedArticle.article_id} updated successfully!`, 'success');
-          overlayController.showSuccess(updatedArticle, () => {
-            exitEditMode();
-          });
-        } catch (err) {
-          alert('Failed to update article: ' + (err.message || 'Unknown error'));
-          overlayController.hide();
-        }
-      } else {
-        // --- CREATE NEW BOOKING ---
-        if (!hasPhoto || p <= 0 || !name) return;
-        if (!photoBlob) return;
-        if (!photoBlob) return;
+          overlayController.showProgress(
+            'Updating Article...',
+            `Saving changes for #${editingArticle.article_id} & syncing with laptop...`
+          );
 
-        overlayController.showProgress(
-          'Syncing Booking...',
-          'Saving booking & syncing with laptop...'
-        );
+          const updatePayload = {
+            article_id: finalId,
+            title: finalCategory,
+            category: finalCategory,
+            price: finalPrice,
+            advance_amount: finalAdv,
+            balance_amount: finalBal,
+            has_jewellery: hasJewel,
+            jewellery_details: jewelDetails,
+            jewellery_price: jewelPrice,
+            customer_name: finalName,
+            customer_phone: finalPhone,
+            customer_alt_phone: finalAltPhone,
+            customer_address: finalAddress,
+            pickup_date: finalPickup,
+            return_date: finalReturn,
+            booking_date: editingArticle.booking_date || getISODate(0),
+            salesman_name: editingArticle.salesman_name || 'Studio',
+            status: editingArticle.status || 'booked',
+          };
 
-        const formData = new FormData();
-        formData.append('photo', photoBlob, `${finalId}.jpg`);
-        formData.append('article_id', finalId);
-        formData.append('title', category || 'Bridal');
-        formData.append('category', category);
-        formData.append('price', p);
-        formData.append('advance_amount', adv);
-        formData.append('balance_amount', bal);
-        formData.append('has_jewellery', hasJewel);
-        formData.append('jewellery_details', jewelDetails);
-        formData.append('jewellery_price', jewelPrice);
-        formData.append('customer_name', name);
-        formData.append('customer_phone', custPhoneInput.value.trim());
-        formData.append('customer_alt_phone', custAltPhoneInput ? custAltPhoneInput.value.trim() : '');
-        formData.append('customer_address', custAddrInput.value.trim());
-        formData.append('pickup_date', pickupInput.value);
-        formData.append('return_date', returnInput.value);
-        formData.append('booking_date', getISODate(0));
-        formData.append('source', 'phone');
-        formData.append('salesman_name', 'Studio');
+          try {
+            // 1. Update metadata fields
+            const res = await api.updateArticle(editingArticle.id, updatePayload);
+            let updatedArticle = res.article || { ...editingArticle, ...updatePayload };
 
-        try {
-          const res = await api.uploadArticle(formData);
-          if (res.success) {
-            if (state.onBookingCreated) state.onBookingCreated(res.article);
-            if (res.whatsapp_dispatch && res.whatsapp_dispatch.success) {
-              res.article._wa_dispatched = true;
+            // 2. If a replacement photo was snapped or selected from gallery, upload it
+            if (photoBlob) {
+              overlayController.showProgress(
+                'Uploading Photo...',
+                `Uploading new garment photo for #${finalId}...`
+              );
+              const photoRes = await api.uploadArticlePhoto(editingArticle.id, photoBlob);
+              if (photoRes && photoRes.article) {
+                updatedArticle = photoRes.article;
+              }
             }
-            overlayController.showSuccess(res.article, resetForm);
-          } else {
-            alert(res.message || 'Failed to submit booking');
+
+            if (state.onBookingUpdated) {
+              state.onBookingUpdated(updatedArticle);
+            }
+
+            showToast(`Article #${updatedArticle.article_id} updated successfully!`, 'success');
+            overlayController.showSuccess(updatedArticle, () => {
+              exitEditMode();
+            });
+          } catch (err) {
+            alert('Failed to update article: ' + (err.message || 'Unknown error'));
             overlayController.hide();
           }
-        } catch (err) {
-          alert('Upload failed: ' + err.message);
-          overlayController.hide();
+        } else {
+          // --- CREATE NEW BOOKING ---
+          if (!hasPhoto || p <= 0 || !name) {
+            alert('Please take a garment photo, enter price, and customer name.');
+            return;
+          }
+          if (!photoBlob) {
+            alert('Please take or select a garment photo first.');
+            return;
+          }
+
+          overlayController.showProgress(
+            'Syncing Booking...',
+            'Saving booking & syncing with laptop...'
+          );
+
+          const formData = new FormData();
+          formData.append('photo', photoBlob, `${finalId}.jpg`);
+          formData.append('article_id', finalId);
+          formData.append('title', category || 'Bridal');
+          formData.append('category', category);
+          formData.append('price', p);
+          formData.append('advance_amount', adv);
+          formData.append('balance_amount', bal);
+          formData.append('has_jewellery', hasJewel);
+          formData.append('jewellery_details', jewelDetails);
+          formData.append('jewellery_price', jewelPrice);
+          formData.append('customer_name', name);
+          formData.append('customer_phone', custPhoneInput.value.trim());
+          formData.append('customer_alt_phone', custAltPhoneInput ? custAltPhoneInput.value.trim() : '');
+          formData.append('customer_address', custAddrInput.value.trim());
+          formData.append('pickup_date', pickupInput.value);
+          formData.append('return_date', returnInput.value);
+          formData.append('booking_date', getISODate(0));
+          formData.append('source', 'phone');
+          formData.append('salesman_name', 'Studio');
+
+          try {
+            const res = await api.uploadArticle(formData);
+            if (res.success) {
+              if (state.onBookingCreated) state.onBookingCreated(res.article);
+              if (res.whatsapp_dispatch && res.whatsapp_dispatch.success) {
+                res.article._wa_dispatched = true;
+              }
+              overlayController.showSuccess(res.article, resetForm);
+            } else {
+              alert(res.message || 'Failed to submit booking');
+              overlayController.hide();
+            }
+          } catch (err) {
+            alert('Upload failed: ' + err.message);
+            overlayController.hide();
+          }
         }
+      } catch (fatalErr) {
+        console.error('Submit booking failed:', fatalErr);
+        alert('Booking submission error: ' + (fatalErr.message || 'Unknown error'));
+        overlayController?.hide();
       }
     });
 
