@@ -7,6 +7,7 @@ Zero third-party cloud costs, zero template restrictions, zero wa.me browser pop
 """
 
 import logging
+import time
 from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
@@ -331,6 +332,8 @@ def whatsapp_check_all_reminders(
     and automatically dispatches reminders via OpenWA.
     """
     p_res = dispatch_due_pickup_reminders()
+    if p_res.get("sent_count", 0) > 0:
+        time.sleep(3)
     r_res = dispatch_due_return_reminders()
     p_sent = p_res.get("sent_count", 0)
     r_sent = r_res.get("sent_count", 0)

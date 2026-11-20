@@ -61,10 +61,12 @@ def list_articles(
     category: Optional[str] = None,
     salesman: Optional[str] = None,
     stage: Optional[str] = None,
+    sort: Optional[str] = "lexical",
     current_user: dict = Depends(require_staff_or_owner),
 ):
     """
     List articles with optional search, category, and stage filters.
+    Defaults to lexical (A-Z) order by customer name and garment details.
     Accessible by staff and owner.
     """
     db = get_db()
@@ -99,7 +101,11 @@ def list_articles(
             query += " AND status = ?"
             params.append(st_clean)
 
-    query += " ORDER BY created_at DESC"
+    if sort == "newest":
+        query += " ORDER BY created_at DESC"
+    else:
+        # Default: Lexical order by customer name, falling back to title and article_id
+        query += " ORDER BY LOWER(COALESCE(NULLIF(TRIM(customer_name), ''), NULLIF(TRIM(title), ''), article_id)) ASC, article_id ASC"
     rows = db.execute(query, params).fetchall()
     return {
         "success": True,

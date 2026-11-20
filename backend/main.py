@@ -54,8 +54,10 @@ async def _reminder_scheduler_loop():
     try:
         from backend.services.whatsapp import dispatch_due_pickup_reminders, dispatch_due_return_reminders
         p_res = dispatch_due_pickup_reminders()
-        r_res = dispatch_due_return_reminders()
         p_sent = p_res.get("sent_count", 0)
+        if p_sent > 0:
+            await asyncio.sleep(3)
+        r_res = dispatch_due_return_reminders()
         r_sent = r_res.get("sent_count", 0)
         if p_sent > 0 or r_sent > 0:
             logger.info(f"[WHATSAPP SCHEDULER] Warmup scan auto-dispatched {p_sent} pickup and {r_sent} return reminder(s).")
@@ -85,8 +87,10 @@ async def lifespan(app: FastAPI):
     try:
         from backend.services.whatsapp import dispatch_due_pickup_reminders, dispatch_due_return_reminders
         p_res = dispatch_due_pickup_reminders()
-        r_res = dispatch_due_return_reminders()
         p_sent = p_res.get("sent_count", 0)
+        if p_sent > 0:
+            await asyncio.sleep(3)
+        r_res = dispatch_due_return_reminders()
         r_sent = r_res.get("sent_count", 0)
         if p_sent > 0 or r_sent > 0:
             logger.info(f"[WHATSAPP] Sent {p_sent} pickup and {r_sent} return reminder(s) on startup.")

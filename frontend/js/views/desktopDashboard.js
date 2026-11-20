@@ -12,7 +12,7 @@ import { renderIcon } from '../icons.js';
 import { openAddArticleModal } from '../modals/addArticleModal.js';
 import { openQrPairingModal } from '../modals/qrPairingModal.js';
 import { renderHeaderHTML, bindHeaderEvents } from './desktop/desktopHeader.js?v=12';
-import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=9';
+import { filterArticles, getTodayISO } from './desktop/desktopFilters.js?v=10';
 import { createArticleCard } from './desktop/articleCard.js?v=15';
 
 const formatINR = (val) => Number(val || 0).toLocaleString('en-IN');
@@ -36,6 +36,7 @@ export function createDesktopDashboard(containerEl, state) {
     filterSpecificDate: '',
     filterRangeStart: '',
     filterRangeEnd: '',
+    sortBy: 'lexical',
   };
 
   let logoUrl = state.logoUrl || localStorage.getItem('app_logo_url') || '/assets/logo.png';
@@ -142,6 +143,12 @@ export function createDesktopDashboard(containerEl, state) {
               <button type="button" class="filter-chip" data-pay="paid">Fully Paid</button>
             </div>
 
+            <div class="chips-group" id="sort-chips-container">
+              <span class="chips-label">Order:</span>
+              <button type="button" class="filter-chip active" data-sort="lexical" title="Lexical order (A to Z by customer name &amp; details)">A–Z Lexical</button>
+              <button type="button" class="filter-chip" data-sort="newest" title="Newest bookings first">Newest</button>
+            </div>
+
             <div class="chips-group" id="jewellery-chips-container">
               <span class="chips-label">Add-ons:</span>
               <button type="button" class="filter-chip" id="chip-filter-jewellery">💍 With Jewellery</button>
@@ -224,6 +231,7 @@ export function createDesktopDashboard(containerEl, state) {
   const stageChips = containerEl.querySelectorAll('#stage-chips-container .filter-chip');
   const catChips = containerEl.querySelectorAll('#category-chips-container .filter-chip');
   const payChips = containerEl.querySelectorAll('#payment-chips-container .filter-chip');
+  const sortChips = containerEl.querySelectorAll('#sort-chips-container .filter-chip');
   const dateFieldSelect = containerEl.querySelector('#date-field-select');
   const datePresets = containerEl.querySelectorAll('#date-presets-container .filter-chip:not(.clear-date-btn)');
   const btnClearDate = containerEl.querySelector('#btn-clear-date-filter');
@@ -459,6 +467,15 @@ export function createDesktopDashboard(containerEl, state) {
     });
   });
 
+  sortChips.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      sortChips.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterState.sortBy = btn.dataset.sort;
+      renderGrid();
+    });
+  });
+
   const jewelChip = containerEl.querySelector('#chip-filter-jewellery');
   jewelChip?.addEventListener('click', () => {
     const isActive = jewelChip.classList.toggle('active');
@@ -528,6 +545,7 @@ export function createDesktopDashboard(containerEl, state) {
     filterState.filterSpecificDate = '';
     filterState.filterRangeStart = '';
     filterState.filterRangeEnd = '';
+    filterState.sortBy = 'lexical';
 
     if (searchInput) searchInput.value = '';
     catChips.forEach((b) => b.classList.toggle('active', b.dataset.cat === 'all'));
@@ -535,6 +553,7 @@ export function createDesktopDashboard(containerEl, state) {
       b.classList.toggle('active', b.dataset.pay === 'all');
       b.classList.remove('due', 'paid');
     });
+    sortChips.forEach((b) => b.classList.toggle('active', b.dataset.sort === 'lexical'));
     datePresets.forEach((b) => b.classList.toggle('active', b.dataset.preset === 'all'));
     if (btnClearDate) btnClearDate.style.display = 'none';
 

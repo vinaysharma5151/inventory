@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from backend import sse as sse_hub
-from backend.config import APP_ENV, APP_VERSION, UPLOADS_DIR, get_local_ip
+from backend.config import APP_ENV, APP_VERSION, LICENSE_API_BASE, SHOP_ID, SHOP_NAME, UPLOADS_DIR, get_local_ip
 from backend.database import get_db
 from backend.services.auth import (
     get_client_ip,
@@ -30,7 +30,12 @@ from backend.services.backup_service import (
     create_database_backup,
     update_inventory_csv_backup,
 )
-from backend.services.licensing import check_license, register_shop_in_supabase
+from backend.services.licensing import (
+    check_license,
+    fetch_central_shops_status,
+    initiate_shop_payment,
+    verify_shop_license,
+)
 from backend.services.qr_service import generate_qr_data_url
 
 router = APIRouter()
@@ -432,23 +437,98 @@ async def complete_first_run_setup(request: Request):
 
 
 # ---------------------------------------------------------------------------
-# License Activation Check (Supabase)
+# Dynamic Subscription & License Verification System
 # ---------------------------------------------------------------------------
-@router.get("/license-status")
-def license_status():
-    """Check Supabase activation status for this shop. Called on every app boot."""
+@router.get("/license/config")
+def get_license_config():
+    """Returns local license configuration identifier (SHOP_ID, SHOP_NAME, API base)."""
     db = get_db()
-    shop_row = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
-    shop_name = shop_row["value"] if shop_row and shop_row["value"] else ""
+    db_id = db.execute("SELECT value FROM settings WHERE key = 'shop_id'").fetchone()
+    db_name = db.execute("SELECT value FROM settings WHERE key = 'shop_name'").fetchone()
+    
+    cfg_id = SHOP_ID
+    if cfg_id is None and db_id and db_id["value"] and db_id["value"].isdigit():
+        cfg_id = int(db_id["value"])
 
-    allowed, message = check_license(shop_name)
+    cfg_name = SHOP_NAME or (db_name["value"] if db_name and db_name["value"] else "")
 
     return {
         "success": True,
-        "allowed": allowed,
-        "shop_name": shop_name,
-        "message": message,
+        "config": {
+            "SHOP_ID": cfg_id,
+            "SHOP_NAME": cfg_name,
+            "LICENSE_API_BASE": LICENSE_API_BASE,
+        }
     }
+
+
+@router.get("/license-status")
+@router.get("/license/status")
+def license_status(
+    shop_id: Optional[int] = None,
+    shop_name: Optional[str] = None,
+):
+    """
+    Check subscription and license activation status using central license checker.
+    Called on every app boot. If offline, evaluates cached license within 7 days.
+    """
+    result = verify_shop_license(shop_id=shop_id, shop_name=shop_name)
+    shop = result.get("shop") or {}
+
+    return {
+        "success": True,
+        "allowed": result.get("allowed", False),
+        "is_active": result.get("is_active", False),
+        "shop": shop,
+        "shop_name": shop.get("shop_name", shop_name or ""),
+        "message": result.get("message", ""),
+        "offline": result.get("offline", False),
+    }
+
+
+@router.get("/license/shops")
+def get_all_shops_status_proxy():
+    """
+    Transparent proxy to GET https://darshan-seq.onrender.com/shops/status
+    Bypasses browser CORS restrictions while retaining identical data shape.
+    """
+    shops, err = fetch_central_shops_status()
+    if shops is None:
+        return {
+            "success": False,
+            "data": [],
+            "message": err or "Failed to fetch shops status from central server",
+        }
+    return {
+        "success": True,
+        "data": shops,
+    }
+
+
+@router.post("/license/{shop_id}/pay")
+@router.post("/license/pay")
+def initiate_license_payment(
+    shop_id: Optional[int] = None,
+    customer_phone: str = "9999999999",
+):
+    """
+    Initiates payment for shop renewal via POST /shops/{shop_id}/pay.
+    Returns checkoutUrl for customer UPI QR payment.
+    """
+    target_id = shop_id or SHOP_ID
+    if target_id is None:
+        db = get_db()
+        db_id = db.execute("SELECT value FROM settings WHERE key = 'shop_id'").fetchone()
+        if db_id and db_id["value"] and db_id["value"].isdigit():
+            target_id = int(db_id["value"])
+
+    if target_id is None:
+        return {
+            "success": False,
+            "message": "Cannot initiate payment: Missing shop_id.",
+        }
+
+    return initiate_shop_payment(shop_id=target_id, customer_phone=customer_phone)
 
 
 # ---------------------------------------------------------------------------

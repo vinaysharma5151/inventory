@@ -16,6 +16,7 @@ import json
 import logging
 import mimetypes
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -37,6 +38,25 @@ STATIC_OPENWA_API_KEY = "owa_k1_34994de68ea8f5cefb0a24b24ffbdc16ffdd2ee3979283b6
 
 DEFAULT_OPENWA_SERVER_URL = STATIC_OPENWA_SERVER_URL
 DEFAULT_OPENWA_API_KEY = STATIC_OPENWA_API_KEY
+
+# Minimum buffer (in seconds) enforced between consecutive WhatsApp message dispatches
+MESSAGE_SEND_BUFFER_SECONDS = 3.0
+_last_message_send_time = 0.0
+
+
+def _apply_message_send_buffer() -> None:
+    """
+    Enforces a minimum 3-second buffer gap between consecutive WhatsApp message dispatches
+    to avoid gateway throttling and rate-limit issues.
+    """
+    global _last_message_send_time
+    now = time.time()
+    elapsed = now - _last_message_send_time
+    if _last_message_send_time > 0 and elapsed < MESSAGE_SEND_BUFFER_SECONDS:
+        delay = MESSAGE_SEND_BUFFER_SECONDS - elapsed
+        logger.info(f"[WHATSAPP] Cooldown buffer: sleeping {delay:.2f}s before sending next message...")
+        time.sleep(delay)
+    _last_message_send_time = time.time()
 
 
 def format_phone_number(phone_raw: Optional[str]) -> Optional[str]:
@@ -286,6 +306,9 @@ def send_openwa_message(
                 resolved_image_file = cand
                 break
 
+    # Enforce minimum 3s cooldown buffer before outgoing API dispatch
+    _apply_message_send_buffer()
+
     # Case 1: Send Image with e-bill caption (if photo available and caption <= 1024 chars)
     if resolved_image_file:
         try:
@@ -458,7 +481,8 @@ def generate_ebill_text(article: Dict[str, Any], shop_name: Optional[str] = None
         f"{balance_line}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📌 *Please Note:*\n"
-        f"• No alterations after booking.\n"
+        f"• No exchanges or refunds once booked.\n"
+        f"• Balance due must be paid on pickup day.\n"
         f"• Please return on or before {return_date}. Late returns will be charged ₹300/day.\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"🙏 *Thank you!* See you on pickup day."
@@ -647,7 +671,10 @@ def dispatch_due_pickup_reminders() -> Dict[str, Any]:
     sent_count = 0
     fail_count = 0
 
-    for r in rows:
+    for idx, r in enumerate(rows):
+        if idx > 0:
+            logger.info(f"[WHATSAPP REMINDERS] Pausing {MESSAGE_SEND_BUFFER_SECONDS}s buffer before next pickup reminder ({idx + 1}/{len(rows)})...")
+            time.sleep(MESSAGE_SEND_BUFFER_SECONDS)
         art = dict(r)
         success, msg, extra = send_pickup_reminder_for_article(art["id"])
         if success:
@@ -694,7 +721,10 @@ def dispatch_due_return_reminders() -> Dict[str, Any]:
     sent_count = 0
     fail_count = 0
 
-    for r in rows:
+    for idx, r in enumerate(rows):
+        if idx > 0:
+            logger.info(f"[WHATSAPP REMINDERS] Pausing {MESSAGE_SEND_BUFFER_SECONDS}s buffer before next return reminder ({idx + 1}/{len(rows)})...")
+            time.sleep(MESSAGE_SEND_BUFFER_SECONDS)
         art = dict(r)
         success, msg, extra = send_return_reminder_for_article(art["id"])
         if success:

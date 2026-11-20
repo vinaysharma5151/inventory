@@ -45,8 +45,8 @@ export const authApi = {
   },
 
   /**
-   * Checks Supabase license activation status for this shop.
-   * @returns {Promise<{success: boolean, allowed: boolean, shop_name: string, message: string}>}
+   * Checks subscription and license activation status for this shop.
+   * @returns {Promise<{success: boolean, allowed: boolean, shop_name: string, shop?: object, message: string}>}
    */
   async getLicenseStatus() {
     try {

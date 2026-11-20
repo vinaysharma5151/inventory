@@ -11,9 +11,10 @@
 
 import { api } from './api.js?v=12';
 import { playLiveSyncChime, showToast } from './toast.js';
-import { createDesktopDashboard } from './views/desktopDashboard.js?v=17';
+import { createDesktopDashboard } from './views/desktopDashboard.js?v=18';
 import { createMobileBookingView } from './views/mobileBookingView.js?v=23';
 import { openLoginModal } from './modals/loginModal.js';
+import { verifyLicense, showRenewalModal } from './services/licenseService.js?v=2';
 
 class App {
   constructor() {
@@ -108,10 +109,22 @@ class App {
       // Load settings (shop name, logo)
       await this.loadSettings();
 
-      // --- License Activation Check (Supabase) ---
-      const licenseStatus = await api.getLicenseStatus().catch(() => ({ allowed: true }));
+      // --- Dynamic Subscription & License Verification Flow ---
+      let licenseStatus = await verifyLicense().catch(err => {
+        console.warn('[LICENSE] Verification error, falling back to cached status:', err);
+        return null;
+      });
+
+      if (!licenseStatus) {
+        licenseStatus = await api.getLicenseStatus().catch(() => ({ allowed: true }));
+      }
+
       if (!licenseStatus.allowed) {
-        this._showLicenseLockScreen(licenseStatus.message, licenseStatus.shop_name);
+        this._showLicenseLockScreen(
+          licenseStatus.message,
+          licenseStatus.shop?.shop_name || licenseStatus.shop_name,
+          licenseStatus.shop
+        );
         return;
       }
 
@@ -378,82 +391,38 @@ class App {
   }
 
   /**
-   * Renders a full-screen "License Inactive" lock screen.
-   * The app is completely inaccessible until the vendor activates the license in Supabase.
+   * Renders a locked screen and displays the renewal modal.
+   * Prompts user with shop name, expiry date, renewal fee, and payment initiation.
+   * Auto-unlocks when payment is confirmed via 4s polling.
    */
-  _showLicenseLockScreen(message, shopName) {
+  _showLicenseLockScreen(message, shopName, shopObj = null) {
     const sn = shopName || this.shopName || 'Your Studio';
-    const logo = this.logoUrl || '/assets/logo.png';
+    const shop = shopObj || {
+      shop_name: sn,
+      amount: 3000,
+      expires_at: 'Expired',
+    };
+
+    // Lock root interface to prevent unauthorized interaction
     if (this.rootEl) {
       this.rootEl.innerHTML = `
         <div style="
           min-height: 100vh;
+          background: radial-gradient(ellipse at 50% 0%, #1a0308 0%, #0e0105 100%);
           display: flex;
-          flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: radial-gradient(ellipse at 50% 0%, #1a0308 0%, #0e0105 100%);
-          padding: 28px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          text-align: center;
         ">
-          <style>
-            @keyframes lockPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.04);opacity:1} }
-          </style>
-
-          <div style="
-            width: 84px; height: 84px;
-            border-radius: 18px;
-            background: #fff;
-            border: 2px solid rgba(212,160,23,0.3);
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 18px; padding: 8px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.55);
-            animation: lockPulse 2.5s ease-in-out infinite;
-          ">
-            <img src="${logo}" alt="${sn}" style="width:100%;height:100%;object-fit:contain;"
-              onerror="this.parentElement.innerHTML='<span style=font-size:40px>🔒</span>'" />
-          </div>
-
-          <div style="font-size: 32px; margin-bottom: 10px;">🔒</div>
-
-          <h1 style="font-size: 20px; font-weight: 800; color: #F5E6C8; margin: 0 0 6px;">
-            ${sn}
-          </h1>
-
-          <div style="
-            display: inline-block;
-            background: rgba(220,38,38,0.15);
-            border: 1px solid rgba(220,38,38,0.35);
-            border-radius: 8px;
-            padding: 6px 14px;
-            font-size: 11px;
-            font-weight: 700;
-            color: #FCA5A5;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            margin-bottom: 18px;
-          ">License Inactive</div>
-
-          <p style="font-size: 14px; color: rgba(245,230,200,0.6); max-width: 340px; line-height: 1.65; margin: 0 0 28px;">
-            ${message || 'Your license is not active. Contact your vendor to activate this installation.'}
-          </p>
-
-          <div style="display:flex; flex-direction:column; gap:10px; width:100%; max-width:260px;">
-            <button onclick="location.reload(true)" style="
-              padding: 12px 24px;
-              background: linear-gradient(135deg, #C9920A, #D4A017);
-              color: #1a0308; border: none; border-radius: 10px;
-              font-weight: 700; font-size: 14px; cursor: pointer; letter-spacing: 0.03em;
-            ">🔄 Retry Connection</button>
-            <div style="font-size: 11px; color: rgba(245,230,200,0.28); line-height: 1.6;">
-              Store: <strong style="color:rgba(245,230,200,0.45);">${sn}</strong><br>
-              Ask your vendor to activate this store in the dashboard.
-            </div>
-          </div>
         </div>
       `;
     }
+
+    // Open renewal modal with auto-unlock polling
+    showRenewalModal(shop, {
+      onUnlock: async () => {
+        await this.launchMainApp();
+      }
+    });
   }
 }
 

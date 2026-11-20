@@ -207,7 +207,7 @@ export function createMobileBookingView(containerEl, state) {
             <div class="quick-date-chips-wrap">
               <span class="chips-hint-label">Return in:</span>
               <div class="quick-date-chips">
-                <button type="button" class="date-chip" data-offset="2">+2 Days</button>
+                <button type="button" class="date-chip" data-offset="1">+1 Day</button>
                 <button type="button" class="date-chip" data-offset="3">+3 Days</button>
                 <button type="button" class="date-chip" data-offset="5">+5 Days</button>
                 <button type="button" class="date-chip" data-offset="7">+1 Week</button>

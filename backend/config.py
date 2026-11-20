@@ -11,7 +11,15 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Supabase License Credentials (server-side only — never served to browser)
+# Central License Checker & Subscription API Configuration
+# ---------------------------------------------------------------------------
+LICENSE_API_BASE = os.getenv("LICENSE_API_BASE", "https://darshan-seq.onrender.com").rstrip("/")
+_raw_shop_id = os.getenv("SHOP_ID", "").strip()
+SHOP_ID = int(_raw_shop_id) if _raw_shop_id and _raw_shop_id.isdigit() else None
+SHOP_NAME = os.getenv("SHOP_NAME", "").strip()
+
+# ---------------------------------------------------------------------------
+# Supabase License Credentials (legacy / fallback)
 # ---------------------------------------------------------------------------
 SUPABASE_URL = "https://wyxzoqggpbpmfmbmzlwa.supabase.co"
 SUPABASE_ANON_KEY = (
@@ -36,7 +44,7 @@ else:
 APP_ENV = "prod"
 IS_DEV = False
 
-APP_VERSION = "2.4.1"
+APP_VERSION = "2.4.2"
 DB_PATH = DATA_DIR / "lehenga_inventory.sqlite"
 UPLOADS_DIR = DATA_DIR / "uploads"
 LOGS_DIR = DATA_DIR / "logs"

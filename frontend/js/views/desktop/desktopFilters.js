@@ -20,12 +20,53 @@ export const getTodayISO = (offset = 0) => {
 };
 
 /**
- * Filters the list of articles according to the current filter state.
+ * Returns a display string used for alphabetical / lexical ordering.
+ * Prefers customer name, then outfit title, then article ID.
+ * @param {object} item
+ * @returns {string}
+ */
+export function getArticleLexicalKey(item) {
+  if (!item) return '';
+  const customer = (item.customer_name || '').trim();
+  if (customer) return customer;
+  const title = (item.title || '').trim();
+  if (
+    title &&
+    !title.startsWith('Booking –') &&
+    !title.startsWith('Booking -') &&
+    title.toLowerCase() !== (item.category || '').toLowerCase()
+  ) {
+    return title;
+  }
+  return (item.article_id || '').trim();
+}
+
+/**
+ * Compares two article objects for lexical (alphabetical A-Z) sorting.
+ * @param {object} a
+ * @param {object} b
+ * @returns {number}
+ */
+export function compareArticlesLexically(a, b) {
+  const keyA = getArticleLexicalKey(a);
+  const keyB = getArticleLexicalKey(b);
+  const cmp = keyA.localeCompare(keyB, undefined, { sensitivity: 'base', numeric: true });
+  if (cmp !== 0) return cmp;
+  const idA = (a.article_id || '').trim();
+  const idB = (b.article_id || '').trim();
+  const idCmp = idA.localeCompare(idB, undefined, { numeric: true });
+  if (idCmp !== 0) return idCmp;
+  return (b.id || 0) - (a.id || 0);
+}
+
+/**
+ * Filters the list of articles according to the current filter state,
+ * returning results in lexical (A-Z) order by default.
  * @param {Array} articles
- * @param {object} state - Current filter criteria
+ * @param {object} [state={}] - Current filter criteria
  * @returns {Array}
  */
-export function filterArticles(articles, state) {
+export function filterArticles(articles, state = {}) {
   const {
     searchQuery,
     selectedCategory,
@@ -37,9 +78,10 @@ export function filterArticles(articles, state) {
     filterSpecificDate,
     filterRangeStart,
     filterRangeEnd,
+    sortBy = 'lexical',
   } = state;
 
-  return articles.filter((item) => {
+  const filtered = articles.filter((item) => {
     // 1. Text Search Matching
     const q = (searchQuery || '').toLowerCase().trim();
     if (q) {
@@ -132,4 +174,13 @@ export function filterArticles(articles, state) {
 
     return true;
   });
+
+  if (sortBy === 'newest') {
+    filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+  } else {
+    // Default: Lexical order (A-Z) by customer name & details
+    filtered.sort(compareArticlesLexically);
+  }
+
+  return filtered;
 }
