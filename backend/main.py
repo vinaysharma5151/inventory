@@ -145,7 +145,7 @@ async def security_and_cache_middleware(request: Request, call_next):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self' ws: http:; "
+        "connect-src 'self' ws: wss: http: https:; "
         "media-src 'self' blob: data:; "
         "frame-ancestors 'none';"
     )

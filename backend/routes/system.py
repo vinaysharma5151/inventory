@@ -34,6 +34,7 @@ from backend.services.licensing import (
     check_license,
     fetch_central_shops_status,
     initiate_shop_payment,
+    register_shop_in_central_api,
     verify_shop_license,
 )
 from backend.services.qr_service import generate_qr_data_url
@@ -397,14 +398,10 @@ async def complete_first_run_setup(request: Request):
     )
     db.commit()
 
-    # Register shop in Supabase (best-effort, non-blocking)
+    # Register shop in central license API and persist assigned shop_id (best-effort)
+    registered_shop_id = None
     try:
-        import threading
-        threading.Thread(
-            target=register_shop_in_supabase,
-            args=(shop_name,),
-            daemon=True,
-        ).start()
+        registered_shop_id, _ = register_shop_in_central_api(shop_name)
     except Exception:
         pass
 
@@ -430,6 +427,7 @@ async def complete_first_run_setup(request: Request):
     return {
         "success": True,
         "is_completed": True,
+        "shop_id": registered_shop_id,
         "shop_name": shop_name,
         "logo_url": logo_url,
         "message": f"First-time setup completed successfully for '{shop_name}'.",

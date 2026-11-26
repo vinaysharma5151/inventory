@@ -37,21 +37,19 @@ export async function getLocalConfig() {
     if (window.APP_CONFIG.LICENSE_API_BASE) apiBase = window.APP_CONFIG.LICENSE_API_BASE;
   }
 
-  // 2. Query local backend /api/license/config if any key is missing
-  if (!shopId || !shopName) {
-    try {
-      const res = await fetch('/api/license/config');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.config) {
-          if (!shopId && json.config.SHOP_ID != null) shopId = json.config.SHOP_ID;
-          if (!shopName && json.config.SHOP_NAME) shopName = json.config.SHOP_NAME;
-          if (json.config.LICENSE_API_BASE) apiBase = json.config.LICENSE_API_BASE;
-        }
+  // 2. Always query local backend /api/license/config so server-assigned SHOP_ID/SHOP_NAME take precedence over stale localStorage
+  try {
+    const res = await fetch('/api/license/config');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.config) {
+        if (json.config.SHOP_ID != null) shopId = json.config.SHOP_ID;
+        if (json.config.SHOP_NAME) shopName = json.config.SHOP_NAME;
+        if (json.config.LICENSE_API_BASE) apiBase = json.config.LICENSE_API_BASE;
       }
-    } catch (_) {
-      // Backend config query error, proceed with local fallbacks
     }
+  } catch (_) {
+    // Backend config query error, proceed with local fallbacks
   }
 
   const numericId = (shopId != null && !isNaN(shopId)) ? Number(shopId) : null;
@@ -120,19 +118,24 @@ async function resolveShopId(shop, config) {
   if (shop && shop.id != null) return shop.id;
   if (config.SHOP_ID != null) return config.SHOP_ID;
 
-  // Attempt to query /shops to resolve id by shop_name
-  try {
-    const res = await fetch(`${config.LICENSE_API_BASE}/shops`).catch(() => null);
-    if (res && res.ok) {
-      const json = await res.json();
-      const allShops = json?.data || [];
-      const match = allShops.find(s => s.shop_name && s.shop_name.toLowerCase() === shop.shop_name.toLowerCase());
-      if (match && match.id != null) {
-        shop.id = match.id;
-        return match.id;
+  // Attempt to query /shops (with local proxy fallback) to resolve id by shop_name
+  const targetName = (shop?.shop_name || config.SHOP_NAME || '').trim().toLowerCase();
+  if (!targetName) return null;
+
+  for (const url of [`${config.LICENSE_API_BASE}/shops`, '/api/license/shops']) {
+    try {
+      const res = await fetch(url).catch(() => null);
+      if (res && res.ok) {
+        const json = await res.json();
+        const allShops = json?.data || [];
+        const match = allShops.find(s => s.shop_name && s.shop_name.trim().toLowerCase() === targetName);
+        if (match && match.id != null) {
+          if (shop) shop.id = match.id;
+          return match.id;
+        }
       }
-    }
-  } catch (_) {}
+    } catch (_) {}
+  }
 
   return null;
 }
@@ -604,11 +607,18 @@ export function showRenewalModal(shop, options = {}) {
 
     updateStatus('Connecting to secure payment gateway. Please wait...');
 
+    // Pre-open tab synchronously on user click so browser popup blockers don't block it after await
+    let payWin = null;
+    try {
+      payWin = window.open('about:blank', '_blank');
+    } catch (_) {}
+
     try {
       const config = await getLocalConfig();
       const shopIdToPay = shop?.id || config.SHOP_ID || await resolveShopId(shop, config);
 
       if (!shopIdToPay) {
+        if (payWin && !payWin.closed) payWin.close();
         updateStatus('Cannot initiate payment: Missing Shop ID. Please contact support.', 'error');
         payBtn.disabled = false;
         payBtn.innerHTML = `<span>Pay Now & Renew</span><span style="font-size:17px;">💳</span>`;
@@ -619,6 +629,7 @@ export function showRenewalModal(shop, options = {}) {
       const paymentRes = await initiatePayment(shopIdToPay, config.LICENSE_API_BASE);
 
       if (!paymentRes.success || !paymentRes.checkoutUrl) {
+        if (payWin && !payWin.closed) payWin.close();
         updateStatus(paymentRes.message || 'Payment initiation failed. Please retry.', 'error');
         payBtn.disabled = false;
         payBtn.innerHTML = `<span>Pay Now & Renew</span><span style="font-size:17px;">💳</span>`;
@@ -627,11 +638,14 @@ export function showRenewalModal(shop, options = {}) {
 
       const checkoutUrl = paymentRes.checkoutUrl;
 
-      // 2. Open checkoutUrl in browser so customer can scan UPI QR code
-      const popup = window.open(checkoutUrl, '_blank');
-      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        // Pop-up was blocked by browser — provide direct link
-        window.location.href = checkoutUrl;
+      // 2. Navigate pre-opened tab (or fallback to window.open / same-tab redirect)
+      if (payWin && !payWin.closed) {
+        payWin.location.href = checkoutUrl;
+      } else {
+        const popup = window.open(checkoutUrl, '_blank');
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          window.location.href = checkoutUrl;
+        }
       }
 
       // Update button & status box to active polling state

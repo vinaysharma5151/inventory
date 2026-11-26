@@ -363,6 +363,87 @@ def initiate_shop_payment(shop_id: int, customer_phone: str = "9999999999") -> D
         }
 
 
+def register_shop_in_central_api(shop_name: str) -> Tuple[Optional[int], str]:
+    """
+    Registers a new shop in the central license API (POST /shops) on first-time setup
+    and stores the assigned shop_id in local SQLite settings.
+    Best-effort: network/server errors are logged and never crash setup.
+    """
+    clean_name = (shop_name or "").strip()
+    if not clean_name:
+        return None, "Empty shop name"
+
+    # 1. Check if shop already exists in central registry to avoid duplicates
+    shops, _ = fetch_central_shops_status()
+    if shops:
+        for item in shops:
+            if str(item.get("shop_name", "")).strip().lower() == clean_name.lower():
+                existing_id = item.get("id")
+                if existing_id is not None:
+                    _save_shop_id(int(existing_id))
+                    logger.info(f"[LICENSE] Shop '{clean_name}' already registered with id={existing_id}.")
+                    return int(existing_id), "Shop already registered"
+
+    # 2. Create new shop via POST /shops?shop_name=...&timer=1+month&amount=3000.0&is_active=false
+    params = urllib.parse.urlencode({
+        "shop_name": clean_name,
+        "timer": "1 month",
+        "amount": 3000.0,
+        "is_active": "false",
+    })
+    endpoint = f"{LICENSE_API_BASE.rstrip('/')}/shops?{params}"
+    req = urllib.request.Request(endpoint, data=b"", method="POST")
+    req.add_header("Accept", "application/json")
+    req.add_header("User-Agent", "Bhavi-Client/2.4")
+
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        new_id = (
+            data.get("id")
+            or (data.get("data") or {}).get("id")
+            or (data.get("shop") or {}).get("id")
+        )
+        if new_id is None:
+            # Fallback: look up newly created shop by name
+            refreshed, _ = fetch_central_shops_status()
+            if refreshed:
+                for item in refreshed:
+                    if str(item.get("shop_name", "")).strip().lower() == clean_name.lower():
+                        new_id = item.get("id")
+                        break
+
+        if new_id is not None:
+            _save_shop_id(int(new_id))
+            logger.info(f"[LICENSE] Registered '{clean_name}' in central license API (shop_id={new_id}).")
+            return int(new_id), "Registered successfully"
+
+        logger.warning(f"[LICENSE] Registered '{clean_name}' but response lacked shop_id: {data}")
+        return None, "Registered without shop_id"
+
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        logger.warning(f"[LICENSE] HTTP {e.code} registering shop '{clean_name}': {err_body}")
+        return None, f"Registration failed (HTTP {e.code})"
+    except Exception as e:
+        logger.warning(f"[LICENSE] Could not register shop '{clean_name}' (offline/error): {e}")
+        return None, f"Registration skipped: {e}"
+
+
+def _save_shop_id(shop_id: int) -> None:
+    """Persist assigned central shop_id into local SQLite settings."""
+    try:
+        db = get_db()
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('shop_id', ?)",
+            (str(int(shop_id)),),
+        )
+        db.commit()
+    except Exception as e:
+        logger.error(f"[LICENSE] Could not save shop_id={shop_id} to SQLite: {e}")
+
+
 def check_license(shop_name: str) -> Tuple[bool, str]:
     """
     Backwards-compatible helper for legacy callers.
